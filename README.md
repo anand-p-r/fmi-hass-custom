@@ -42,7 +42,8 @@ sensor:
 
 If latitude are longitude are not provided, it will be detected from the home latitude and longitude settings. The user preferred weather attributes (min_temperature, max_humidity etc) are used to compare the day's weather forecast and provide a relative best time for outdoor activity. If the conditions are not met, state of sensor (`_best_time_of_day`) will be "not_available". Other sensors (monitored weather conditions) include "condition", "temperature", "wind speed", "humidity", "clouds" and "rain".
 
-{% configuration %}
+```YAML
+# Configuration Description
 name:
   description: "Name of sensor."
   required: false
@@ -103,8 +104,7 @@ max_precipitation:
   required: false
   type: float
   default: "Defaults to 0.2mm/hr"
-{% endconfiguration %}
-
+```
 This platform is an alternative to [fmi weather](#weather) platform.
 
 ## Weather
@@ -123,7 +123,7 @@ weather:
 If latitude are longitude are not provided, it will be detected from the home latitude and longitude settings.
 
 ```YAML
-# Configuration
+# Configuration Description
 name:
   description: "Name of weather entity."
   required: false
