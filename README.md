@@ -122,7 +122,8 @@ weather:
 
 If latitude are longitude are not provided, it will be detected from the home latitude and longitude settings.
 
-{% configuration %}
+```YAML
+# Configuration
 name:
   description: "Name of weather entity."
   required: false
@@ -143,8 +144,7 @@ offset:
   required: false
   type: integer
   default: "Defaults to 1 (weather forecast every hour)"
-{% endconfiguration %}
-
+```
 This platform is an alternative to [fmi sensor](#sensor) platform.
 
 ## Original Author 
