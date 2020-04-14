@@ -1,6 +1,6 @@
 # fmi-hass-custom
 
-`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location.
+`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location. This custom component relies on python library [fmi-weather-client==0.1.0](https://pypi.org/project/fmi-weather-client/)
 
 Currently following platforms are supported within Home Assistant:
 
