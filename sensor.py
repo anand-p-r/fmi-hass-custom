@@ -351,6 +351,11 @@ class FMIBestConditionSensor(Entity):
         return self._state
 
     @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement of this entity, if any."""
+        return self._unit_of_measurement
+
+    @property
     def icon(self):
         """Icon to use in the frontend, if any."""
         return self._icon
