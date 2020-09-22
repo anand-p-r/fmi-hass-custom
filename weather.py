@@ -1,14 +1,20 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
 
 from datetime import timedelta
-import logging
-
 from dateutil import tz
+
 import fmi_weather_client as fmi
 from fmi_weather_client.errors import ClientError, ServerError
 import voluptuous as vol
 
 # Import homeassistant platform dependencies
+from homeassistant.const import (
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    CONF_OFFSET,
+)
+
 import homeassistant.components.sun as sun
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -22,49 +28,18 @@ from homeassistant.components.weather import (
     PLATFORM_SCHEMA,
     WeatherEntity,
 )
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
+
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import Throttle
 
-# FMI Weather Visibility Constants
-FMI_WEATHER_SYMBOL_MAP = {
-    0: "clear-night",  # custom value 0 - not defined by FMI
-    1: "sunny",  # "Clear",
-    2: "partlycloudy",  # "Partially Clear",
-    21: "rainy",  # "Light Showers",
-    22: "pouring",  # "Showers",
-    23: "pouring",  # "Strong Rain Showers",
-    3: "cloudy",  # "Cloudy",
-    31: "rainy",  # "Weak rains",
-    32: "rainy",  # "Rains",
-    33: "pouring",  # "Heavy Rains",
-    41: "snowy-rainy",  # "Weak Snow",
-    42: "cloudy",  # "Cloudy",
-    43: "snowy",  # "Strong Snow",
-    51: "snowy",  # "Light Snow",
-    52: "snowy",  # "Snow",
-    53: "snowy",  # "Heavy Snow",
-    61: "lightning",  # "Thunderstorms",
-    62: "lightning-rainy",  # "Strong Thunderstorms",
-    63: "lightning",  # "Thunderstorms",
-    64: "lightning-rainy",  # "Strong Thunderstorms",
-    71: "rainy",  # "Weak Sleet",
-    72: "rainy",  # "Sleet",
-    73: "pouring",  # "Heavy Sleet",
-    81: "rainy",  # "Light Sleet",
-    82: "rainy",  # "Sleet",
-    83: "pouring",  # "Heavy Sleet",
-    91: "fog",  # "Fog",
-    92: "fog",  # "Fog"
-}
+from .const import (
+    FORECAST_OFFSET,
+    DEFAULT_NAME,
+    ATTRIBUTION,
+    FMI_WEATHER_SYMBOL_MAP,
+    MIN_TIME_BETWEEN_UPDATES
+)
 
-_LOGGER = logging.getLogger(__name__)
-
-ATTRIBUTION = "Weather Data provided by FMI"
-
-DEFAULT_NAME = "FMI"
-
-FORECAST_OFFSET = [1, 2, 3, 4, 6, 8, 12, 24]  # Based on API test runs
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -74,8 +49,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
     }
 )
-
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=15)
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -117,7 +90,7 @@ class FMI:
                 + " and message "
                 + err.message
             )
-            _LOGGER.error(err_string)
+            LOGGER.error(err_string)
         except ServerError as err:
             err_string = (
                 "Server error with status "
@@ -125,7 +98,7 @@ class FMI:
                 + " and message "
                 + err.body
             )
-            _LOGGER.error(err_string)
+            LOGGER.error(err_string)
             self.current = None
 
         # Hourly weather for 24hrs.
@@ -141,7 +114,7 @@ class FMI:
                 + " and message "
                 + err.message
             )
-            _LOGGER.error(err_string)
+            LOGGER.error(err_string)
         except ServerError as err:
             err_string = (
                 "Server error with status "
@@ -149,7 +122,7 @@ class FMI:
                 + " and message "
                 + err.body
             )
-            _LOGGER.error(err_string)
+            LOGGER.error(err_string)
             self.hourly = None
 
 
