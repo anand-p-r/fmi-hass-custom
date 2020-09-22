@@ -1,4 +1,13 @@
-"""Support for weather service from FMI (Finnish Meteorological Institute)."""
+"""Support for weather service from FMI (Finnish Meteorological Institute) for sensor platform."""
+
+from datetime import datetime, timedelta
+from dateutil import tz
+import requests
+import time
+
+import xml.etree.ElementTree as ET
+from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
 
 # Import homeassistant platform dependencies
 from homeassistant.const import (
@@ -6,71 +15,33 @@ from homeassistant.const import (
     ATTR_LOCATION,
     ATTR_TEMPERATURE,
     ATTR_TIME,
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
-    CONF_NAME,
-    CONF_OFFSET,
     SPEED_METERS_PER_SECOND,
     TEMP_CELSIUS,
     PERCENTAGE,
 )
-
-from datetime import date, datetime, timedelta
-import requests
-import time
-from dateutil import tz
-
-import fmi_weather_client as fmi
-from fmi_weather_client.errors import ClientError, ServerError
-
-import voluptuous as vol
-import xml.etree.ElementTree as ET
-
-from geopy.distance import geodesic
-from geopy.geocoders import Nominatim
-
-# Import homeassistant platform dependencies
-from homeassistant.components.sensor import PLATFORM_SCHEMA
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 
 from .const import (
-    DEFAULT_NAME,
-    CONF_MIN_HUMIDITY,
-    CONF_MAX_HUMIDITY,
-    CONF_MIN_TEMP,
-    CONF_MAX_TEMP,
-    CONF_MIN_WIND_SPEED,
-    CONF_MAX_WIND_SPEED,
-    CONF_MIN_PRECIPITATION,
-    CONF_MAX_PRECIPITATION,
-    LOGGER,
-    FMI_WEATHER_SYMBOL_MAP,
-    BEST_CONDITION_NOT_AVAIL,
-    BEST_COND_SYMBOLS,
-    BEST_CONDITION_AVAIL,
-    ATTR_PRECIPITATION,
+    ATTRIBUTION,
+    DOMAIN,
     ATTR_HUMIDITY,
     ATTR_WIND_SPEED,
-    ATTRIBUTION,
+    ATTR_PRECIPITATION,
+    MIN_TIME_BETWEEN_LIGHTNING_UPDATES,
     BASE_URL,
+    LIGHTNING_LIMIT,
+    LOGGER,
     ATTR_DISTANCE,
     ATTR_STRIKES,
     ATTR_PEAK_CURRENT,
     ATTR_CLOUD_COVER,
-    ATTR_ELLIPSE_MAJOR,
-    LIGHTNING_LIMIT,
-    MIN_TIME_BETWEEN_UPDATES,
-    MIN_TIME_BETWEEN_LIGHTNING_UPDATES,
-    FORECAST_OFFSET
+    ATTR_ELLIPSE_MAJOR
 )
 
-HUMIDITY_RANGE = list(range(1, 101))
-TEMP_RANGE = list(range(-40, 50))
-WIND_SPEED = list(range(0, 31))
+from . import get_weather_symbol
 
-SENSOR_BEST_TYPES = {
+SENSOR_TYPES = {
     "place": ["Place", None],
     "weather": ["Condition", None],
     "temperature": ["Temperature", TEMP_CELSIUS],
@@ -79,242 +50,38 @@ SENSOR_BEST_TYPES = {
     "clouds": ["Cloud Coverage", PERCENTAGE],
     "rain": ["Rain", "mm/hr"],
     "forecast_time": ["Time", None],
-    "time": ["Best Time Of Day", None]
+    "time": ["Best Time Of Day", None],
 }
 
 SENSOR_LIGHTNING_TYPES = {
     "lightning": ["Lightning Strikes", None]
 }
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-        vol.Inclusive(
-            CONF_LATITUDE, "coordinates", "Latitude and longitude must exist together"
-        ): cv.latitude,
-        vol.Inclusive(
-            CONF_LONGITUDE, "coordinates", "Latitude and longitude must exist together"
-        ): cv.longitude,
-        vol.Optional(CONF_OFFSET, default=0): vol.In(FORECAST_OFFSET),
-        vol.Optional(CONF_MIN_HUMIDITY, default=30): vol.In(HUMIDITY_RANGE),
-        vol.Optional(CONF_MAX_HUMIDITY, default=70): vol.In(HUMIDITY_RANGE),
-        vol.Optional(CONF_MIN_TEMP, default=10): vol.In(TEMP_RANGE),
-        vol.Optional(CONF_MAX_TEMP, default=30): vol.In(TEMP_RANGE),
-        vol.Optional(CONF_MIN_WIND_SPEED, default=0): vol.In(WIND_SPEED),
-        vol.Optional(CONF_MAX_WIND_SPEED, default=25): vol.In(WIND_SPEED),
-        vol.Optional(CONF_MIN_PRECIPITATION, default=0): cv.small_float,
-        vol.Optional(CONF_MAX_PRECIPITATION, default=0.2): cv.small_float,
-    }
-)
 
-
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the FMI Weather Best Time Of the Day sensor."""
-    if None in (hass.config.latitude, hass.config.longitude):
-        LOGGER.error("Latitude or longitude not set in Home Assistant config")
+async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+    """Set up the FMI Sensor, including Best Time Of the Day sensor."""
+    if discovery_info is None:
         return
-
-    latitude = config.get(CONF_LATITUDE, hass.config.latitude)
-    longitude = config.get(CONF_LONGITUDE, hass.config.longitude)
-    name = config.get(CONF_NAME)
-    time_step = config.get(CONF_OFFSET)
-
-    try:
-        min_temperature = float(config.get(CONF_MIN_TEMP))
-        max_temperature = float(config.get(CONF_MAX_TEMP))
-        min_humidity = float(config.get(CONF_MIN_HUMIDITY))
-        max_humidity = float(config.get(CONF_MAX_HUMIDITY))
-        min_wind_speed = float(config.get(CONF_MIN_WIND_SPEED))
-        max_wind_speed = float(config.get(CONF_MAX_WIND_SPEED))
-        min_precip = float(config.get(CONF_MIN_PRECIPITATION))
-        max_precip = float(config.get(CONF_MAX_PRECIPITATION))
-    except ValueError:
-        LOGGER.error("Parameter configuration mismatch!")
-        return
-
-    fmi_object = FMI(
-        latitude,
-        longitude,
-        min_temperature,
-        max_temperature,
-        min_humidity,
-        max_humidity,
-        min_wind_speed,
-        max_wind_speed,
-        min_precip,
-        max_precip,
-        time_step,
-    )
 
     entity_list = []
 
-    for sensor_type in SENSOR_BEST_TYPES:
-        entity_list.append(FMIBestConditionSensor(name, fmi_object, sensor_type))
+    if "data_key" not in discovery_info:
+        return
+
+    fmi_obj = hass.data[DOMAIN][discovery_info["data_key"]]
+
+    for sensor_type in SENSOR_TYPES:
+        entity_list.append(
+            FMIBestConditionSensor(
+                DOMAIN, fmi_obj, sensor_type
+            )
+        )
 
     for sensor_type in SENSOR_LIGHTNING_TYPES:
-        entity_list.append(FMILightningStrikesSensor(name, fmi_object.latitude, fmi_object.longitude, sensor_type))
+        entity_list.append(
+            FMILightningStrikesSensor(fmi_obj.name, fmi_obj.latitude, fmi_obj.longitude, sensor_type))
 
-    add_entities(entity_list, True)
-
-
-def get_weather_symbol(symbol):
-    """Get a weather symbol for the symbol value."""
-    if symbol in FMI_WEATHER_SYMBOL_MAP.keys():
-        return FMI_WEATHER_SYMBOL_MAP[symbol]
-
-    return ""
-
-
-class FMI:
-    """Get the latest data from FMI."""
-
-    def __init__(
-        self,
-        latitude,
-        longitude,
-        min_temperature,
-        max_temperature,
-        min_humidity,
-        max_humidity,
-        min_wind_speed,
-        max_wind_speed,
-        min_precip,
-        max_precip,
-        time_step,
-    ):
-        """Initialize the data object."""
-        # Input parameters
-        self.latitude = latitude
-        self.longitude = longitude
-        self.time_step = time_step
-        self.min_temperature = min_temperature
-        self.max_temperature = max_temperature
-        self.min_humidity = min_humidity
-        self.max_humidity = max_humidity
-        self.min_wind_speed = min_wind_speed
-        self.max_wind_speed = max_wind_speed
-        self.min_precip = min_precip
-        self.max_precip = max_precip
-
-        # Updated from FMI API
-        self.hourly = None
-        self.current = None
-
-        # Best Time Attributes derived based on forecast weather data
-        self.best_time = None
-        self.best_temperature = None
-        self.best_humidity = None
-        self.best_wind_speed = None
-        self.best_precipitation = None
-        self.best_state = None
-
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    def update(self):
-        """Get the latest and forecasted weather from FMI."""
-
-        def update_best_weather_condition():
-            if self.hourly is None:
-                return
-
-            if self.current is None:
-                return
-
-            curr_date = date.today()
-
-            # Init values
-            self.best_state = BEST_CONDITION_NOT_AVAIL
-            self.best_time = self.current.data.time.astimezone(tz.tzlocal())
-            self.best_temperature = self.current.data.temperature.value
-            self.best_humidity = self.current.data.humidity.value
-            self.best_wind_speed = self.current.data.wind_speed.value
-            self.best_precipitation = self.current.data.precipitation_amount.value
-
-            for forecast in self.hourly.forecasts:
-                local_time = forecast.time.astimezone(tz.tzlocal())
-
-                if local_time.day == curr_date.day + 1:
-                    # Tracking best conditions for only this day
-                    break
-
-                if (
-                    (forecast.symbol.value in BEST_COND_SYMBOLS)
-                    and (forecast.wind_speed.value >= self.min_wind_speed)
-                    and (forecast.wind_speed.value <= self.max_wind_speed)
-                ):
-                    if (
-                        forecast.temperature.value >= self.min_temperature
-                        and forecast.temperature.value <= self.max_temperature
-                    ):
-                        if (
-                            forecast.humidity.value >= self.min_humidity
-                            and forecast.humidity.value <= self.max_humidity
-                        ):
-                            if (
-                                forecast.precipitation_amount.value >= self.min_precip
-                                and forecast.precipitation_amount.value
-                                <= self.max_precip
-                            ):
-                                # What more can you ask for?
-                                # Compare with temperature value already stored and update if necessary
-                                self.best_state = BEST_CONDITION_AVAIL
-
-                if self.best_state is BEST_CONDITION_AVAIL:
-                    if forecast.temperature.value > self.best_temperature:
-                        self.best_time = local_time
-                        self.best_temperature = forecast.temperature.value
-                        self.best_humidity = forecast.humidity.value
-                        self.best_wind_speed = forecast.wind_speed.value
-                        self.best_precipitation = forecast.precipitation_amount.value
-
-
-        # Current Weather
-        try:
-            self.current = fmi.weather_by_coordinates(self.latitude, self.longitude)
-
-        except ClientError as err:
-            err_string = (
-                "Client error with status "
-                + str(err.status_code)
-                + " and message "
-                + err.message
-            )
-            LOGGER.error(err_string)
-        except ServerError as err:
-            err_string = (
-                "Server error with status "
-                + str(err.status_code)
-                + " and message "
-                + err.body
-            )
-            LOGGER.error(err_string)
-            self.current = None
-
-        # Hourly weather for 24hrs.
-        try:
-            self.hourly = fmi.forecast_by_coordinates(
-                self.latitude, self.longitude, timestep_hours=self.time_step
-            )
-
-        except ClientError as err:
-            err_string = (
-                "Client error with status "
-                + str(err.status_code)
-                + " and message "
-                + err.message
-            )
-            LOGGER.error(err_string)
-        except ServerError as err:
-            err_string = (
-                "Server error with status "
-                + str(err.status_code)
-                + " and message "
-                + err.body
-            )
-            LOGGER.error(err_string)
-            self.hourly = None
-
-        # Update best time parameters
-        update_best_weather_condition()
+    async_add_entities(entity_list, True)
 
 
 class FMIBestConditionSensor(Entity):
@@ -322,13 +89,17 @@ class FMIBestConditionSensor(Entity):
 
     def __init__(self, name, fmi_object, sensor_type):
         """Initialize the sensor."""
-        self.client_name = name
-        self._name = SENSOR_BEST_TYPES[sensor_type][0]
+        if fmi_object is not None:
+            self.client_name = fmi_object.name
+        else:
+            self.client_name = name
+
+        self._name = SENSOR_TYPES[sensor_type][0]
         self.fmi_object = fmi_object
         self._state = None
         self._icon = None
         self.type = sensor_type
-        self._unit_of_measurement = SENSOR_BEST_TYPES[sensor_type][1]
+        self._unit_of_measurement = SENSOR_TYPES[sensor_type][1]
 
     @property
     def name(self):
@@ -341,34 +112,42 @@ class FMIBestConditionSensor(Entity):
         return self._state
 
     @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement of this entity, if any."""
-        return self._unit_of_measurement
-
-    @property
     def icon(self):
         """Icon to use in the frontend, if any."""
         return self._icon
 
     @property
+    def unit_of_measurement(self):
+        """Return unit of measurement."""
+        return self._unit_of_measurement
+
+    @property
     def device_state_attributes(self):
         """Return the state attributes."""
         if self.type == "time":
-            return {
-                ATTR_LOCATION: self.fmi_object.current.place,
-                ATTR_TIME: self.fmi_object.best_time,
-                ATTR_TEMPERATURE: self.fmi_object.best_temperature,
-                ATTR_HUMIDITY: self.fmi_object.best_humidity,
-                ATTR_PRECIPITATION: self.fmi_object.best_precipitation,
-                ATTR_WIND_SPEED: self.fmi_object.best_wind_speed,
-                ATTR_ATTRIBUTION: ATTRIBUTION,
-            }
+            if self.fmi_object is not None:
+                if self.fmi_object.current is not None:
+                    return {
+                        ATTR_LOCATION: self.fmi_object.current.place,
+                        ATTR_TIME: self.fmi_object.best_time,
+                        ATTR_TEMPERATURE: self.fmi_object.best_temperature,
+                        ATTR_HUMIDITY: self.fmi_object.best_humidity,
+                        ATTR_PRECIPITATION: self.fmi_object.best_precipitation,
+                        ATTR_WIND_SPEED: self.fmi_object.best_wind_speed,
+                        ATTR_ATTRIBUTION: ATTRIBUTION,
+                    }
 
         return {ATTR_ATTRIBUTION: ATTRIBUTION}
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
+        if self.fmi_object is None:
+            return
+
         self.fmi_object.update()
+
+        if self.fmi_object.current is None:
+            return
 
         if self.type == "place":
             self._state = self.fmi_object.current.place
@@ -382,8 +161,22 @@ class FMIBestConditionSensor(Entity):
             # Current weather
             source_data = self.fmi_object.current.data
         else:
-            # Forecasted weather based on configured time_step - Only first.
-            source_data = self.fmi_object.hourly.forecasts[0]
+            # Forecasted weather based on configured time_step - next forecasted hour, if available
+
+            if self.fmi_object.hourly is None:
+                return
+
+            # If current time is half past or more then use the hour next to next hour
+            # otherwise fallback to the next hour
+            if len(self.fmi_object.hourly.forecasts) > 1:
+                curr_min = datetime.now().minute
+                if curr_min >= 30:
+                    source_data = self.fmi_object.hourly.forecasts[1]
+            else:
+                source_data = self.fmi_object.hourly.forecasts[0]
+
+        if source_data is None:
+            return
 
         if self.type == "forecast_time":
             self._state = source_data.time.astimezone(tz.tzlocal())

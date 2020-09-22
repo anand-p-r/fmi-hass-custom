@@ -1,6 +1,6 @@
 # fmi-hass-custom
 
-`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location. This custom component relies on python library [fmi-weather-client==0.1.0](https://pypi.org/project/fmi-weather-client/)
+`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location.
 
 Currently following platforms are supported within Home Assistant:
 
@@ -18,14 +18,14 @@ Currently following platforms are supported within Home Assistant:
 
 ## Sensor
 
-The sensor plaform checks for new data every 15 minutes. In addition to weather attributes, sensor also provides reverse geo-coded location for the given latitute/longitude as well as the best time of the day based on user preferences.
+The sensor plaform checks for new data every 30 minutes. In addition to weather attributes, sensor also provides reverse geo-coded location for the given latitute/longitude as well as the best time of the day based on user preferences.
 
 To add FMI sensor to a Home Assistant installation add the following to configuration YAML file:
 
 ```YAML
 # Example configuration YAML entry
 sensor:
-  - platform: fmi  
+  - platform: fmi
     name: FMI
     latitude: 1234567
     longitude: 1234567
@@ -41,6 +41,7 @@ sensor:
 ```
 
 If latitude are longitude are not provided, it will be detected from the home latitude and longitude settings. The user preferred weather attributes (min_temperature, max_humidity etc) are used to compare the day's weather forecast and provide a relative best time for outdoor activity. If the conditions are not met, state of sensor (`_best_time_of_day`) will be "not_available". Other sensors (monitored weather conditions) include "condition", "temperature", "wind speed", "humidity", "clouds" and "rain".
+Sensor includes lightning strike observations as well. State value of this sensor shows the closest location (reverse geocoded address or latitude/longitude), where the last lightning strike was observed along. Additionally it contains the number of strikes, peak current in kA, cloud coverage and ellipse major. Attributes also contain the last 5 lightning observations with reverse geocoded addresses. Data is pulled every 60secs.
 
 ```YAML
 # Configuration Description
@@ -147,5 +148,5 @@ offset:
 ```
 This platform is an alternative to [fmi sensor](#sensor) platform.
 
-## Original Author 
+## Original Author
 Anand Radhakrishnan [@anand-p-r](https://github.com/anand-p-r)
