@@ -9,7 +9,8 @@ Follow these instructions if an older version of the component was in use
     1. Remove all references of the sensor and weather platforms from configuration.yaml.
     2. Restart Home Assistant
     3. UI references could also be removed (or they could be the markers to correct when the integration is loaded again using steps below)
-
+    4. Most importantly clear browser cache where the Home Assistant UI is accessed. Sometimes, the new integration does not show up without this step.
+    
 ## Installation
 
     1. Using a tool of choice open the directory (folder) for HA configuration (where you find configuration YAML file).
