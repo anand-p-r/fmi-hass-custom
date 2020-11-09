@@ -2,7 +2,16 @@
 from datetime import timedelta
 import logging
 
-LOGGER = logging.getLogger(__package__)
+_LOGGER = logging.getLogger(__package__)
+
+DOMAIN = "fmi"
+NAME = "FMI"
+MANUFACTURER = "Finnish Meteorological Institute"
+
+COORDINATOR = "coordinator"
+MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=30)
+MIN_TIME_BETWEEN_LIGHTNING_UPDATES = timedelta(minutes=60)
+UNDO_UPDATE_LISTENER = "undo_update_listener"
 
 CONF_MIN_HUMIDITY = "min_relative_humidity"
 CONF_MAX_HUMIDITY = "max_relative_humidity"
@@ -13,31 +22,28 @@ CONF_MAX_WIND_SPEED = "max_wind_speed"
 CONF_MIN_PRECIPITATION = "min_precipitation"
 CONF_MAX_PRECIPITATION = "max_precipitation"
 
-DOMAIN = "fmi"
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=30)
-MIN_TIME_BETWEEN_LIGHTNING_UPDATES = timedelta(minutes=60)
-
 HUMIDITY_RANGE = list(range(1, 101))
 TEMP_RANGE = list(range(-40, 50))
 WIND_SPEED = list(range(0, 31))
-FORECAST_OFFSET = [0, 1, 2, 3, 4, 6, 8, 12, 24]  # Based on API test runs
+
+FORECAST_OFFSET = [1, 2, 3, 4, 6, 8, 12, 24]  # Based on API test runs
 DEFAULT_NAME = "FMI"
 
-ATTR_HUMIDITY = "relative_humidity"
-ATTR_WIND_SPEED = "wind_speed"
-ATTR_PRECIPITATION = "precipitation"
 ATTR_DISTANCE = "distance"
 ATTR_STRIKES = "strikes"
 ATTR_PEAK_CURRENT = "peak_current"
 ATTR_CLOUD_COVER = "cloud_cover"
 ATTR_ELLIPSE_MAJOR = "ellipse_major"
-
-BEST_COND_SYMBOLS = [1, 2, 21, 3, 31, 32, 41, 42, 51, 52, 91, 92]
-
-BEST_CONDITION_AVAIL = "available"
-BEST_CONDITION_NOT_AVAIL = "not_available"
+ATTR_FORECAST = CONF_FORECAST = "forecast"
+ATTR_HUMIDITY = "relative_humidity"
+ATTR_WIND_SPEED = "wind_speed"
+ATTR_PRECIPITATION = "precipitation"
 
 ATTRIBUTION = "Weather Data provided by FMI"
+
+BEST_COND_SYMBOLS = [1, 2, 21, 3, 31, 32, 41, 42, 51, 52, 91, 92]
+BEST_CONDITION_AVAIL = "available"
+BEST_CONDITION_NOT_AVAIL = "not_available"
 
 # Constants for Lightning strikes
 LIGHTNING_LIMIT = 5

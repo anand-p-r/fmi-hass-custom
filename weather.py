@@ -1,7 +1,6 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
 from dateutil import tz
 
-# Import homeassistant platform dependencies
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_PRECIPITATION,
@@ -13,34 +12,65 @@ from homeassistant.components.weather import (
     ATTR_WEATHER_PRESSURE,
     WeatherEntity,
 )
-
-from .const import (
-    ATTRIBUTION,
-    DOMAIN
-)
+from homeassistant.const import CONF_NAME
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import get_weather_symbol
+from .const import _LOGGER, ATTRIBUTION, COORDINATOR, DOMAIN, MANUFACTURER, NAME
+
+PARALLEL_UPDATES = 1
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the FMI weather platform."""
-    if discovery_info is None:
-        return
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Add an FMI weather entity from a config_entry."""
+    name = config_entry.data[CONF_NAME]
 
-    if "data_key" in discovery_info.keys():
-        async_add_entities(
-            [FMIWeather(DOMAIN, hass.data[DOMAIN][discovery_info["data_key"]])], True
-        )
+    coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
+
+    async_add_entities([FMIWeatherEntity(name, coordinator)], False)
 
 
-class FMIWeather(WeatherEntity):
-    """Representation of a weather condition."""
+class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
+    """Define an FMI Weather Entity."""
 
-    def __init__(self, domain, fmi_weather):
+    def __init__(self, name, coordinator):
         """Initialize FMI weather object."""
-        self._fmi = fmi_weather
+        super().__init__(coordinator)
+        self._name = name
+        self._attrs = {}
+        self._unit_system = "Metric"
+        self._fmi = coordinator
 
-        self._name = fmi_weather.name
+    @property
+    def name(self):
+        """Return the name of the place based on Lat/Long."""
+        if self._fmi is None:
+            return self._name
+
+        if self._fmi.current is None:
+            return self._name
+
+        return self._fmi.current.place
+
+    @property
+    def attribution(self):
+        """Return the attribution."""
+        return ATTRIBUTION
+
+    @property
+    def unique_id(self):
+        """Return a unique_id for this entity."""
+        return self.coordinator.unique_id
+
+    @property
+    def device_info(self):
+        """Return the device info."""
+        return {
+            "identifiers": {(DOMAIN, self.coordinator.unique_id)},
+            "name": NAME,
+            "manufacturer": MANUFACTURER,
+            "entry_type": "service",
+        }
 
     @property
     def available(self):
@@ -49,16 +79,6 @@ class FMIWeather(WeatherEntity):
             return False
 
         return self._fmi.current is not None
-
-    @property
-    def attribution(self):
-        """Return the attribution."""
-        return ATTRIBUTION
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
 
     @property
     def temperature(self):
@@ -132,7 +152,7 @@ class FMIWeather(WeatherEntity):
         if self._fmi is None:
             return None
 
-        if self._fmi.hourly is None:
+        if self._fmi.forecast is None:
             return None
 
         data = None
@@ -148,8 +168,10 @@ class FMIWeather(WeatherEntity):
                 ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                 ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
             }
-            for forecast in self._fmi.hourly.forecasts
+            for forecast in self._fmi.forecast.forecasts
         ]
+
+        _LOGGER.debug("FMI- Forecast data: %s", data)
 
         return data
 
