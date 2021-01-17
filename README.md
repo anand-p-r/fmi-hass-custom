@@ -1,6 +1,6 @@
 # fmi-hass-custom
 
-`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location.
+`fmi-hass-custom` is a Home Assistant custom component for weather and sensor platform. It uses [FMI's Open-Data](https://en.ilmatieteenlaitos.fi/open-data) as a source for current and forecasted meteorological data for a given location. Data update frequency is hard-fixed at 30mins.
 
 ## Pre-Installation
 

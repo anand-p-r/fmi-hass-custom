@@ -150,12 +150,14 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     def forecast(self):
         """Return the forecast array."""
         if self._fmi is None:
+            _LOGGER.debug("FMI: Coordinator is not available!")
             return None
+
+        # Get latest weather data from API call
+        self._fmi.async_request_refresh()
 
         if self._fmi.forecast is None:
             return None
-
-        data = None
 
         data = [
             {
@@ -171,13 +173,6 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             for forecast in self._fmi.forecast.forecasts
         ]
 
-        _LOGGER.debug("FMI- Forecast data: %s", data)
+        _LOGGER.debug("FMI: Forecast data: %s", data)
 
         return data
-
-    def update(self):
-        """Get the latest data from FMI."""
-        if self._fmi is None:
-            return None
-
-        self._fmi.update()

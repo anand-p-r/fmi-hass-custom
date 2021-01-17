@@ -31,7 +31,6 @@ from .const import (
     ATTR_HUMIDITY,
     ATTR_WIND_SPEED,
     ATTR_PRECIPITATION,
-    MIN_TIME_BETWEEN_LIGHTNING_UPDATES,
     BASE_URL,
     LIGHTNING_LIMIT,
     ATTR_DISTANCE,
@@ -113,6 +112,8 @@ class FMIBestConditionSensor(CoordinatorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+
+        self.update()
         return self._state
 
     @property
@@ -147,9 +148,14 @@ class FMIBestConditionSensor(CoordinatorEntity):
         """Get the latest data from FMI and updates the states."""
 
         if self._fmi is None:
+            _LOGGER.debug("FMI: Coordinator is not available")
             return
 
+        # Refresh data from API call.
+        self._fmi.async_request_refresh()
+
         if self._fmi.current is None:
+            _LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
 
         if self.type == "place":
@@ -167,6 +173,7 @@ class FMIBestConditionSensor(CoordinatorEntity):
             # Forecasted weather based on configured time_step - next forecasted hour, if available
 
             if self._fmi.forecast is None:
+                _LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
             # If current time is half past or more then use the hour next to next hour
@@ -178,8 +185,8 @@ class FMIBestConditionSensor(CoordinatorEntity):
             else:
                 source_data = self._fmi.forecast.forecasts[0]
 
-
         if source_data is None:
+            _LOGGER.debug("FMI: Sensor Source data is unavailable")
             return
 
         if self.type == "forecast_time":
@@ -222,6 +229,7 @@ class FMILightningStrikesSensor(CoordinatorEntity):
         self.type = sensor_type
         self._unit_of_measurement = SENSOR_LIGHTNING_TYPES[sensor_type][1]
         self.lightning_data = coordinator.lightning_data
+        self._fmi = coordinator
 
         try:
             self._fmi_name = coordinator.current.place
@@ -243,6 +251,8 @@ class FMILightningStrikesSensor(CoordinatorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+
+        self.update()
         return self._state
 
     @property
@@ -290,10 +300,12 @@ class FMILightningStrikesSensor(CoordinatorEntity):
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
-
+        
+        self._fmi.async_request_refresh()
         try:
             self._state = self.lightning_data[0].location
         except:
+            _LOGGER.debug("FMI: Sensor Lightning is unavailable")
             self._state = "Unavailable"
 
         return
