@@ -156,7 +156,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         # Lightning strikes
         self.lightning_data = None
 
-        _LOGGER.debug("Data will be updated every %s min", MIN_TIME_BETWEEN_UPDATES)
+        _LOGGER.debug("FMI: Data will be updated every %s min", MIN_TIME_BETWEEN_UPDATES)
 
         super().__init__(
             hass, _LOGGER, name=DOMAIN, update_interval=MIN_TIME_BETWEEN_UPDATES
@@ -247,9 +247,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     for loc_indx, val in enumerate(val_list):
                         if val != "":
                             val_split = val.split(" ")
-                            #val_split[0] --> latitude
-                            #val_split[1] --> longitude
-                            #val_split[2] --> epoch time
                             lightning_coords = (float(val_split[0]), float(val_split[1]))
                             distance = 0
                             try:
@@ -265,9 +262,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     for indx, val in enumerate(val_list):
                         if val != "":
                             val_split = val.split(" ")
-                            #val_split[1] --> cloud_cover
-                            #val_split[2] --> peak_current
-                            #val_split[3] --> ellipse_major
                             exist_tuple = loc_time_list[indx]
                             if indx == exist_tuple[4]:
                                 add_tuple = (exist_tuple[0], exist_tuple[1], exist_tuple[2], exist_tuple[3], val_split[0], val_split[1], val_split[2], val_split[3])
@@ -305,27 +299,21 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         try:
             async with timeout(10):
-                self.current = await self._hass.async_add_executor_job(
-                    fmi.weather_by_coordinates, self.latitude, self.longitude
-                )
-                self.forecast = await self._hass.async_add_executor_job(
-                    fmi.forecast_by_coordinates,
-                    self.latitude,
-                    self.longitude,
-                    self.time_step,
-                )
+                self.current = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
+                self.forecast = await fmi.async_forecast_by_coordinates(self.latitude, self.longitude, self.time_step)
 
                 # Update best time parameters
                 await self._hass.async_add_executor_job(
                     update_best_weather_condition
                 )
+                _LOGGER.debug("FMI: Best Conditions updated!")
 
                 # Update lightning strikes
                 await self._hass.async_add_executor_job(
                     update_lightning_strikes
                 )
+                _LOGGER.debug("FMI: Lightning Conditions updated!")
                 
-
         except (ClientError, ServerError) as error:
             raise UpdateFailed(error) from error
         return {}
