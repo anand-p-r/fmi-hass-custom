@@ -18,6 +18,7 @@ from homeassistant.const import (
     SPEED_METERS_PER_SECOND,
     TEMP_CELSIUS,
     PERCENTAGE,
+    DEGREE
 )
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.entity import Entity
@@ -48,7 +49,9 @@ SENSOR_TYPES = {
     "place": ["Place", None],
     "weather": ["Condition", None],
     "temperature": ["Temperature", TEMP_CELSIUS],
-    "wind_speed": ["Wind speed", SPEED_METERS_PER_SECOND],
+    "wind_speed": ["Wind Speed", SPEED_METERS_PER_SECOND],
+    "wind_direction": ["Wind Direction", ""],
+    "wind_gust": ["Wind Gust", SPEED_METERS_PER_SECOND],
     "humidity": ["Humidity", PERCENTAGE],
     "clouds": ["Cloud Coverage", PERCENTAGE],
     "rain": ["Rain", "mm/hr"],
@@ -82,6 +85,33 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             FMILightningStrikesSensor(name, coordinator, sensor_type))
 
     async_add_entities(entity_list, False)
+
+def get_wind_direction_string(wind_direction_in_deg):
+    """Get the string interpretation of wind direction in degrees"""
+    
+    if wind_direction_in_deg is not None:
+        if wind_direction_in_deg <=23:
+            return "N"
+        elif wind_direction_in_deg > 338:
+            return "N"
+        elif (23 < wind_direction_in_deg <= 68):
+            return "NE"
+        elif (68 < wind_direction_in_deg <= 113):
+            return "E"
+        elif (113 < wind_direction_in_deg <= 158):
+            return "SE"
+        elif (158 < wind_direction_in_deg <= 203):
+            return "S"
+        elif (203 < wind_direction_in_deg <= 248):
+            return "SW"
+        elif (248 < wind_direction_in_deg <= 293):
+            return "W"
+        elif (293 < wind_direction_in_deg <= 338):
+            return "NW"
+        else:
+            return "Unavailable"
+    
+    return "Unavailable"
 
 
 class FMIBestConditionSensor(CoordinatorEntity):
@@ -182,6 +212,10 @@ class FMIBestConditionSensor(CoordinatorEntity):
         if source_data is None:
             return
 
+        wind_direction = "Unavailable"
+        if source_data.wind_direction is not None:
+            wind_direction = get_wind_direction_string(source_data.wind_direction.value)
+
         if self.type == "forecast_time":
             self._state = source_data.time.astimezone(tz.tzlocal())
             self._icon = "mdi:av-timer"
@@ -192,6 +226,12 @@ class FMIBestConditionSensor(CoordinatorEntity):
             self._icon = "mdi:thermometer"
         elif self.type == "wind_speed":
             self._state = source_data.wind_speed.value
+            self._icon = "mdi:weather-windy"
+        elif self.type == "wind_direction":
+            self._state = wind_direction
+            self._icon = "mdi:weather-windy"
+        elif self.type == "wind_gust":
+            self._state = source_data.wind_gust.value
             self._icon = "mdi:weather-windy"
         elif self.type == "humidity":
             self._state = source_data.humidity.value
