@@ -39,6 +39,9 @@ from .const import (
     ATTR_PEAK_CURRENT,
     ATTR_CLOUD_COVER,
     ATTR_ELLIPSE_MAJOR,
+    BASE_MAREO_FORC_URL,
+    ATTR_SEAHEIGHT_NOW,
+    ATTR_SEAHEIGHT_FORC,
     COORDINATOR
 )
 
@@ -62,6 +65,11 @@ SENSOR_LIGHTNING_TYPES = {
     "lightning": ["Lightning Strikes", None]
 }
 
+SENSOR_MAREO_TYPES = {
+    "sea_level_now": ["Sea Level", "cm"],
+    "sea_level_6hrs": ["Sea Level in 6hrs", "cm"]
+}
+
 PARALLEL_UPDATES = 1
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -83,11 +91,15 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         entity_list.append(
             FMILightningStrikesSensor(name, coordinator, sensor_type))
 
+    for sensor_type in SENSOR_MAREO_TYPES:
+        entity_list.append(
+            FMIMareoSensor(name, coordinator, sensor_type))
+
     async_add_entities(entity_list, False)
 
 def get_wind_direction_string(wind_direction_in_deg):
     """Get the string interpretation of wind direction in degrees"""
-    
+
     if wind_direction_in_deg is not None:
         if wind_direction_in_deg <=23:
             return "N"
@@ -109,7 +121,7 @@ def get_wind_direction_string(wind_direction_in_deg):
             return "NW"
         else:
             return "Unavailable"
-    
+
     return "Unavailable"
 
 
@@ -340,12 +352,98 @@ class FMILightningStrikesSensor(CoordinatorEntity):
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
-        
+
         self._fmi.async_request_refresh()
         try:
             self._state = self.lightning_data[0].location
         except:
             _LOGGER.debug("FMI: Sensor Lightning is unavailable")
+            self._state = "Unavailable"
+
+        return
+
+class FMIMareoSensor(CoordinatorEntity):
+    """Implementation of a FMI sea water level sensor."""
+
+    def __init__(self, name, coordinator, sensor_type):
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self.client_name = name
+        self._name = SENSOR_MAREO_TYPES[sensor_type][0]
+        self._state = None
+        self._icon = "mdi:waves"
+        self.type = sensor_type
+        self._unit_of_measurement = SENSOR_MAREO_TYPES[sensor_type][1]
+        self.mareo_data = coordinator.mareo_data
+        self._fmi = coordinator
+
+        try:
+            self._fmi_name = coordinator.current.place
+        except:
+            self._fmi_name = None
+
+        self.update()
+
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+
+        if self._fmi_name is not None:
+            return f"{self._fmi_name} {self._name}"
+        else:
+            return f"{self.client_name} {self._name}"
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+
+        self.update()
+        return self._state
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement of this entity, if any."""
+        return self._unit_of_measurement
+
+    @property
+    def icon(self):
+        """Icon to use in the frontend, if any."""
+        return self._icon
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        if self.mareo_data is None:
+            return []
+
+        #if len(self.mareo_data) == 0:
+        #    return []
+
+        return {
+            #ATTR_LOCATION: self.mareo_data[0].location,
+            ATTR_TIME: self.mareo_data.time,
+            ATTR_SEAHEIGHT_NOW: self.mareo_data.sea_level_now,
+            ATTR_SEAHEIGHT_FORC: self.mareo_data.sea_level_6hrs,
+            ATTR_ATTRIBUTION: ATTRIBUTION
+        }
+
+
+    def update(self):
+        """Get the latest data from FMI and updates the states."""
+
+        self._fmi.async_request_refresh()
+        try:
+            if self.type == "sea_level_now":
+                self._state = self.mareo_data.sea_level_now
+                _LOGGER.debug("FMI: Sensor Mareo current level updated")
+            elif self.type == "sea_level_6hrs":
+                self._state = self.mareo_data.sea_level_6hrs
+                _LOGGER.debug("FMI: Sensor Mareo 6hrs level updated")
+            else:
+                self._state = None
+        except:
+            _LOGGER.debug("FMI: Sensor Mareo is unavailable")
             self._state = "Unavailable"
 
         return
