@@ -1,9 +1,11 @@
 {
   "domain": "fmi",
+  "version": "0.3.0",
   "name": "Finnish Meteorological Institute",
   "documentation": "https://www.home-assistant.io/integrations/fmi/",
   "requirements": [
-    "fmi-weather-client==0.1.1"
+    "fmi-weather-client==0.1.1",
+    "geopy>=2.1.0"
   ],
   "dependencies": [],
   "codeowners": [
