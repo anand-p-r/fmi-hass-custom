@@ -53,8 +53,8 @@ BASE_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFea
 # Constants for Mareograph data
 #BASE_MAREO_OBS_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::mareograph::simple&fmisid=132310&timestep=30"
 BASE_MAREO_FORC_URL = "http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&"
-# example: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=59.991325,24.465909&starttime=2021-04-11T13:24:00Z
-## lightning example: https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::lightning::multipointcoverage&timestep=3600&starttime=2021-03-31T00:00:00Z
+# example: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.4&starttime=2021-04-11T13:24:00Z
+#future maybe for sea temperature: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.0&starttime=2021-04-11T13:24:00Z
 
 # FMI Weather Visibility Constants
 FMI_WEATHER_SYMBOL_MAP = {

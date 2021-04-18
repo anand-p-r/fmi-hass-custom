@@ -332,7 +332,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             root_mareo = ET.fromstring(response_mareo.content)
 
-            mareo_op = []
             sealevel_value = []
             sealevel_time = []
             for n in range(len(root_mareo)):
@@ -340,13 +339,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     sealevel_value.append(root_mareo[n][0][3].text)
                     sealevel_time.append(root_mareo[n][0][1].text)
                 else:
-                    print("Sealevel forecast record mismatch - aborting query!")
+                    #print("Sealevel forecast record mismatch - aborting query!")
+                    _LOGGER.debug("Sealevel forecast record mismatch - aborting query!")
                     break
 
             mareo_op = FMIMareoStruct(time_val=sealevel_time[0], sea_level_now=sealevel_value[0], sea_level_6hrs=sealevel_value[12])
             self.mareo_data = mareo_op
+            _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_time[0], sealevel_value[0])
 
-            return
 
         try:
             async with timeout(10):

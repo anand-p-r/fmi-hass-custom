@@ -422,9 +422,9 @@ class FMIMareoSensor(CoordinatorEntity):
 
         return {
             #ATTR_LOCATION: self.mareo_data[0].location,
-            ATTR_TIME: self.mareo_data.time,
-            ATTR_SEAHEIGHT_NOW: self.mareo_data.sea_level_now,
-            ATTR_SEAHEIGHT_FORC: self.mareo_data.sea_level_6hrs,
+            ATTR_TIME: self._fmi.mareo_data.time,
+            ATTR_SEAHEIGHT_NOW: self._fmi.mareo_data.sea_level_now,
+            ATTR_SEAHEIGHT_FORC: self._fmi.mareo_data.sea_level_6hrs,
             ATTR_ATTRIBUTION: ATTRIBUTION
         }
 
@@ -435,11 +435,10 @@ class FMIMareoSensor(CoordinatorEntity):
         self._fmi.async_request_refresh()
         try:
             if self.type == "sea_level_now":
-                self._state = self.mareo_data.sea_level_now
-                _LOGGER.debug("FMI: Sensor Mareo current level updated")
+                self._state = self._fmi.mareo_data.sea_level_now
+                _LOGGER.debug("FMI: Sensor Mareo current level updated with %s", self._state)
             elif self.type == "sea_level_6hrs":
-                self._state = self.mareo_data.sea_level_6hrs
-                _LOGGER.debug("FMI: Sensor Mareo 6hrs level updated")
+                self._state = self._fmi.mareo_data.sea_level_6hrs
             else:
                 self._state = None
         except:

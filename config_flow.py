@@ -11,7 +11,7 @@ from homeassistant.helpers import config_validation as cv
 
 from . import base_unique_id
 from .const import (
-    _LOGGER, 
+    _LOGGER,
     FORECAST_OFFSET,
     CONF_MIN_HUMIDITY,
     CONF_MAX_HUMIDITY,

@@ -173,6 +173,6 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             for forecast in self._fmi.forecast.forecasts
         ]
 
-        _LOGGER.debug("FMI: Forecast data: %s", data)
+        #_LOGGER.debug("FMI: Forecast data: %s", data)
 
         return data
