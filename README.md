@@ -23,7 +23,7 @@ Follow these instructions if an older version of the component was in use
 
 ## Weather and Sensors
 
-In addition to the weather platform, default sensors include different weather conditions (temperature, humidity, wind speed, cloud coverage etc.), "best time of the day" (based on preferences) and closest lightning strikes. Preferences for "best time of the day" can be tweaked by changing the values via UI ```(Configuration --> Integrations --> Finnish Meteorological Institute --> Options)```. For tracking the weather and sensors of another location follow steps 6-7 of ```Installation``` with the latitude and longitude of the location.
+In addition to the weather platform, default sensors include different weather conditions (temperature, humidity, wind speed, cloud coverage etc.), "best time of the day" (based on preferences), closest lightning strikes and sea wave height forecasts. Preferences for "best time of the day" can be tweaked by changing the values via UI ```(Configuration --> Integrations --> Finnish Meteorological Institute --> Options)```. For tracking the weather and sensors of another location follow steps 6-7 of ```Installation``` with the latitude and longitude of the location.
 
 Based on the latitude and longitude, location name is derived by reverse geo-coding. Sensors are then grouped based on the derived location name. For e.g. ```weather.<place_name>```,  ```sensor.<place_name>_temperature```, ```sensor.<place_name>_humidity``` etc.
 

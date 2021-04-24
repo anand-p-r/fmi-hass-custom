@@ -37,8 +37,6 @@ ATTR_FORECAST = CONF_FORECAST = "forecast"
 ATTR_HUMIDITY = "relative_humidity"
 ATTR_WIND_SPEED = "wind_speed"
 ATTR_PRECIPITATION = "precipitation"
-ATTR_SEAHEIGHT_NOW = "sea_level_now"
-ATTR_SEAHEIGHT_FORC = "sea_level_6hrs"
 
 ATTRIBUTION = "Weather Data provided by FMI"
 
