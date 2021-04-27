@@ -330,8 +330,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             root_mareo = ET.fromstring(response_mareo.content)
 
-            #sealevel_value = []
-            #sealevel_time = []
             sealevel_tuple_list = []
             for n in range(len(root_mareo)):
                 if root_mareo[n][0][2].text == 'SeaLevel':
