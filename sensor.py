@@ -40,8 +40,6 @@ from .const import (
     ATTR_CLOUD_COVER,
     ATTR_ELLIPSE_MAJOR,
     BASE_MAREO_FORC_URL,
-    ATTR_SEAHEIGHT_NOW,
-    ATTR_SEAHEIGHT_FORC,
     COORDINATOR
 )
 
@@ -66,8 +64,7 @@ SENSOR_LIGHTNING_TYPES = {
 }
 
 SENSOR_MAREO_TYPES = {
-    "sea_level_now": ["Sea Level", "cm"],
-    "sea_level_6hrs": ["Sea Level in 6hrs", "cm"]
+    "sea_level": ["Sea Level", "cm"]
 }
 
 PARALLEL_UPDATES = 1
@@ -374,7 +371,7 @@ class FMIMareoSensor(CoordinatorEntity):
         self._icon = "mdi:waves"
         self.type = sensor_type
         self._unit_of_measurement = SENSOR_MAREO_TYPES[sensor_type][1]
-        self.mareo_data = coordinator.mareo_data
+        self.mareo_data = coordinator.mareo_data.sea_levels
         self._fmi = coordinator
 
         try:
@@ -417,14 +414,15 @@ class FMIMareoSensor(CoordinatorEntity):
         if self.mareo_data is None:
             return []
 
-        #if len(self.mareo_data) == 0:
-        #    return []
-
         return {
-            #ATTR_LOCATION: self.mareo_data[0].location,
-            ATTR_TIME: self._fmi.mareo_data.time,
-            ATTR_SEAHEIGHT_NOW: self._fmi.mareo_data.sea_level_now,
-            ATTR_SEAHEIGHT_FORC: self._fmi.mareo_data.sea_level_6hrs,
+            ATTR_TIME: self.mareo_data[0][0],
+            "FORECASTS": [
+                {
+                    "time": item[0],
+                    "height": item[1]
+                }
+                for item in self.mareo_data[1:]
+            ],
             ATTR_ATTRIBUTION: ATTRIBUTION
         }
 
@@ -434,13 +432,7 @@ class FMIMareoSensor(CoordinatorEntity):
 
         self._fmi.async_request_refresh()
         try:
-            if self.type == "sea_level_now":
-                self._state = self._fmi.mareo_data.sea_level_now
-                _LOGGER.debug("FMI: Sensor Mareo current level updated with %s", self._state)
-            elif self.type == "sea_level_6hrs":
-                self._state = self._fmi.mareo_data.sea_level_6hrs
-            else:
-                self._state = None
+            self._state = self.mareo_data[0][1]
         except:
             _LOGGER.debug("FMI: Sensor Mareo is unavailable")
             self._state = "Unavailable"
