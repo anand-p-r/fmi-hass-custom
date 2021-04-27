@@ -45,7 +45,8 @@ from .const import (
     BEST_CONDITION_NOT_AVAIL,
     BEST_COND_SYMBOLS,
     BASE_URL,
-    LIGHTNING_LIMIT
+    LIGHTNING_LIMIT,
+    BASE_MAREO_FORC_URL,
 )
 
 PLATFORMS = ["sensor", "weather"]
@@ -118,13 +119,21 @@ class FMILightningStruct():
         self.ellipse_major = ellipse_major
 
 
+class FMIMareoStruct():
+
+    #def __init__(self, time_val=None, sea_level_now=None, sea_level_6hrs=None):
+    def __init__(self, sea_levels=None):
+        """Initialize the sea height data."""
+        self.sea_levels=sea_levels
+
+
 class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching FMI data API."""
 
     def __init__(self, hass, session, config_entry):
         """Initialize."""
 
-        _LOGGER.debug("Using lat: %s and long: %s", 
+        _LOGGER.debug("Using lat: %s and long: %s",
             config_entry.data[CONF_LATITUDE], config_entry.data[CONF_LONGITUDE])
 
         self.latitude = config_entry.data[CONF_LATITUDE]
@@ -155,6 +164,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         # Lightning strikes
         self.lightning_data = None
+
+        # Mareo
+        self.mareo_data = None
 
         _LOGGER.debug("FMI: Data will be updated every %s min", MIN_TIME_BETWEEN_UPDATES)
 
@@ -297,6 +309,41 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             return
 
+        # Update mareo data
+        def update_mareo_data():
+            """Get the latest mareograph forecast data from FMI and update the states."""
+
+            ## Format datetime to string accepted as path parameter in REST
+            start_time = datetime.today()
+            start_time = str(start_time).split(".")[0]
+            start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            start_time = "starttime=" + str(start_time.date()) + "T" + str(start_time.time()) + "Z"
+
+            ## Format location to string accepted as path parameter in REST
+            loc_string = "latlon=" + str(self.latitude) + "," + str(self.longitude)
+
+            base_mareo_url = BASE_MAREO_FORC_URL + loc_string + "&" + start_time + "&"
+            _LOGGER.debug("FMI: Using Mareo url: %s", base_mareo_url)
+
+            ## Fetch data
+            response_mareo = requests.get(base_mareo_url)
+
+            root_mareo = ET.fromstring(response_mareo.content)
+
+            sealevel_tuple_list = []
+            for n in range(len(root_mareo)):
+                if root_mareo[n][0][2].text == 'SeaLevel':
+                    tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
+                    sealevel_tuple_list.append(tuple_to_add)
+                else:
+                    _LOGGER.debug("Sealevel forecast record mismatch - aborting query!")
+                    break
+
+            mareo_op = FMIMareoStruct(sea_levels=sealevel_tuple_list)
+            self.mareo_data = mareo_op
+            _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
+
+
         try:
             async with timeout(10):
                 self.current = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
@@ -313,7 +360,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     update_lightning_strikes
                 )
                 _LOGGER.debug("FMI: Lightning Conditions updated!")
-                
+
+                # Update mareograph data on sea level
+                await self._hass.async_add_executor_job(
+                    update_mareo_data
+                )
+                _LOGGER.debug("FMI: Mareograph sea level data updated!")
+
         except (ClientError, ServerError) as error:
             raise UpdateFailed(error) from error
         return {}
