@@ -344,8 +344,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             mareo_op = FMIMareoStruct(sea_levels=sealevel_tuple_list)
             self.mareo_data = mareo_op
-            _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
-
+            if len(sealevel_tuple_list) > 12:
+                _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
+            else:
+                _LOGGER.debug("FMI: Mareo_data not updated. No data available!")
 
         try:
             async with timeout(10):
