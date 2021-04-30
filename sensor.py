@@ -414,8 +414,14 @@ class FMIMareoSensor(CoordinatorEntity):
         if self.mareo_data is None:
             return []
 
-        if len(self.mareo_data) > 0:
+        if len(self.mareo_data) > 1:
             pass
+        elif len(self.mareo_data) > 0:
+            return {
+                ATTR_TIME: self.mareo_data[0][0],
+                "FORECASTS": [],
+                ATTR_ATTRIBUTION: ATTRIBUTION
+            }
         else:
             return []
 
