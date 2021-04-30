@@ -414,6 +414,17 @@ class FMIMareoSensor(CoordinatorEntity):
         if self.mareo_data is None:
             return []
 
+        if len(self.mareo_data) > 1:
+            pass
+        elif len(self.mareo_data) > 0:
+            return {
+                ATTR_TIME: self.mareo_data[0][0],
+                "FORECASTS": [],
+                ATTR_ATTRIBUTION: ATTRIBUTION
+            }
+        else:
+            return []
+
         return {
             ATTR_TIME: self.mareo_data[0][0],
             "FORECASTS": [
@@ -431,6 +442,7 @@ class FMIMareoSensor(CoordinatorEntity):
         """Get the latest data from FMI and updates the states."""
 
         self._fmi.async_request_refresh()
+
         try:
             self._state = self.mareo_data[0][1]
         except:

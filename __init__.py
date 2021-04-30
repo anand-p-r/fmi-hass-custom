@@ -332,12 +332,15 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             sealevel_tuple_list = []
             for n in range(len(root_mareo)):
-                if root_mareo[n][0][2].text == 'SeaLevel':
-                    tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
-                    sealevel_tuple_list.append(tuple_to_add)
-                else:
-                    _LOGGER.debug("Sealevel forecast record mismatch - aborting query!")
-                    break
+                try:
+                    if root_mareo[n][0][2].text == 'SeaLevel':
+                        tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
+                        sealevel_tuple_list.append(tuple_to_add)
+                    else:
+                        _LOGGER.debug("Sealevel forecast record mismatch - aborting query!")
+                        break
+                except:
+                    _LOGGER.debug(f"Sealevel forecast records not in expected format for index - {n} of locstring - {loc_string}")
 
             mareo_op = FMIMareoStruct(sea_levels=sealevel_tuple_list)
             self.mareo_data = mareo_op
