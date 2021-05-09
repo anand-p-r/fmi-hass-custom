@@ -371,7 +371,6 @@ class FMIMareoSensor(CoordinatorEntity):
         self._icon = "mdi:waves"
         self.type = sensor_type
         self._unit_of_measurement = SENSOR_MAREO_TYPES[sensor_type][1]
-        self.mareo_data = coordinator.mareo_data.sea_levels
         self._fmi = coordinator
 
         try:
@@ -411,14 +410,17 @@ class FMIMareoSensor(CoordinatorEntity):
     @property
     def device_state_attributes(self):
         """Return the state attributes."""
-        if self.mareo_data is None:
+
+        mareo_data = self._fmi.mareo_data.sea_levels
+
+        if mareo_data is None:
             return []
 
-        if len(self.mareo_data) > 1:
+        if len(mareo_data) > 1:
             pass
-        elif len(self.mareo_data) > 0:
+        elif len(mareo_data) > 0:
             return {
-                ATTR_TIME: self.mareo_data[0][0],
+                ATTR_TIME: mareo_data[0][0],
                 "FORECASTS": [],
                 ATTR_ATTRIBUTION: ATTRIBUTION
             }
@@ -426,13 +428,13 @@ class FMIMareoSensor(CoordinatorEntity):
             return []
 
         return {
-            ATTR_TIME: self.mareo_data[0][0],
+            ATTR_TIME: mareo_data[0][0],
             "FORECASTS": [
                 {
                     "time": item[0],
                     "height": item[1]
                 }
-                for item in self.mareo_data[1:]
+                for item in mareo_data[1:]
             ],
             ATTR_ATTRIBUTION: ATTRIBUTION
         }
@@ -442,9 +444,10 @@ class FMIMareoSensor(CoordinatorEntity):
         """Get the latest data from FMI and updates the states."""
 
         self._fmi.async_request_refresh()
+        mareo_data = self._fmi.mareo_data.sea_levels
 
         try:
-            self._state = self.mareo_data[0][1]
+            self._state = mareo_data[0][1]
         except:
             _LOGGER.debug("FMI: Sensor Mareo is unavailable")
             self._state = "Unavailable"
