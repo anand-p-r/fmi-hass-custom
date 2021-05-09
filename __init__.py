@@ -124,7 +124,7 @@ class FMIMareoStruct():
     #def __init__(self, time_val=None, sea_level_now=None, sea_level_6hrs=None):
     def __init__(self, sea_levels=None):
         """Initialize the sea height data."""
-        self.sea_levels=sea_levels
+        self.sea_levels = sea_levels
 
 
 class FMIDataUpdateCoordinator(DataUpdateCoordinator):
