@@ -4,7 +4,6 @@ from datetime import datetime
 from dateutil import tz
 import requests
 import time
-
 import xml.etree.ElementTree as ET
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
@@ -20,6 +19,7 @@ from homeassistant.const import (
     PERCENTAGE,
     DEGREE
 )
+
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
@@ -43,7 +43,9 @@ from .const import (
     COORDINATOR
 )
 
-from . import get_weather_symbol
+from .utils import (
+    get_weather_symbol
+)
 
 SENSOR_TYPES = {
     "place": ["Place", None],

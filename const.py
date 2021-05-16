@@ -1,5 +1,6 @@
 """Constants for the FMI Weather and Sensor integrations."""
 from datetime import timedelta
+
 import logging
 
 _LOGGER = logging.getLogger(__package__)
@@ -45,12 +46,14 @@ BEST_CONDITION_AVAIL = "available"
 BEST_CONDITION_NOT_AVAIL = "not_available"
 
 # Constants for Lightning strikes
+BOUNDING_BOX_RADIUS = 2500
 LIGHTNING_LIMIT = 5
 BASE_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::lightning::multipointcoverage&timestep=3600&"
 
 # Constants for Mareograph data
-#BASE_MAREO_OBS_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::mareograph::simple&fmisid=132310&timestep=30"
 BASE_MAREO_FORC_URL = "http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&"
+
+#BASE_MAREO_OBS_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::mareograph::simple&fmisid=132310&timestep=30"
 # example: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.4&starttime=2021-04-11T13:24:00Z
 #future maybe for sea temperature: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.0&starttime=2021-04-11T13:24:00Z
 

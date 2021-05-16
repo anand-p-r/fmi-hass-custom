@@ -17,20 +17,18 @@ from fmi_weather_client.errors import ClientError, ServerError
 from homeassistant.const import (
     CONF_LATITUDE,
     CONF_LONGITUDE,
-    CONF_OFFSET,
-    SUN_EVENT_SUNSET,
+    CONF_OFFSET
 )
+
 from homeassistant.core import Config, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     _LOGGER,
     COORDINATOR,
     DOMAIN,
-    FMI_WEATHER_SYMBOL_MAP,
     MIN_TIME_BETWEEN_UPDATES,
     UNDO_UPDATE_LISTENER,
     CONF_MIN_HUMIDITY,
@@ -47,6 +45,11 @@ from .const import (
     BASE_URL,
     LIGHTNING_LIMIT,
     BASE_MAREO_FORC_URL,
+    BOUNDING_BOX_HALF_DIST
+)
+
+from .utils import (
+    get_bounding_box
 )
 
 PLATFORMS = ["sensor", "weather"]
@@ -243,19 +246,23 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             ## Format datetime to string accepted as path parameter in REST
             start_time = str(start_time).split(".")[0]
             start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-            start_time = "starttime=" + str(start_time.date()) + "T" + str(start_time.time()) + "Z"
+            start_time_uri_param = f"starttime={str(start_time.date())}T{str(start_time.time())}Z&"
 
-            base_url = BASE_URL + start_time + "&"
+            ## Get Bounding Box coords
+            bbox_coords = get_bounding_box(self.latitude, self.longitude, BOUNDING_BOX_HALF_DIST)
+            bbox_uri_param = f"bbox={bbox_coords.lat_min},{bbox_coords.lon_min},{bbox_coords.lat_max},{bbox_coords.lon_max}&"
+
+            base_url = BASE_URL + start_time_uri_param + bbox_uri_param
+            _LOGGER.debug(f"FMI: Lightning URI - {base_url}")
 
             ## Fetch data
-            response = requests.get(base_url)
-
+            response = requests.get(base_url, timeout=5)
             root = ET.fromstring(response.content)
-
             for child in root.iter():
                 if child.tag.find("positions") > 0:
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
+                    num_locs = 0
                     for loc_indx, val in enumerate(val_list):
                         if val != "":
                             val_split = val.split(" ")
@@ -265,9 +272,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                                 distance = geodesic(lightning_coords, home_cords).km
                             except:
                                 _LOGGER.info(f"Unable to find distance between {lightning_coords} and {home_cords}")
+
                             add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_indx)
                             loc_time_list.append(add_tuple)
-
+                            num_locs += 1
                 elif child.tag.find("doubleOrNilReasonTupleList") > 0:
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
@@ -284,12 +292,15 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             ## First sort for closes entries and filter to limit
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[3])) ## distance
+            _LOGGER.debug(f"FMI - total coords - {len(loc_time_list)}")
+
             loc_time_list = loc_time_list[:LIGHTNING_LIMIT]
 
             ## Second Sort based on date
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[2]), reverse=True)  ## date
 
             geolocator = Nominatim(user_agent="fmi_hassio_sensor")
+            
             ## Reverse geocoding
             op_tuples = []
             for indx, v in enumerate(loc_time_list):
@@ -297,8 +308,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 loc_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(v[2])))
                 try:
                     location = geolocator.reverse(loc, language="en").address
-                except:
-                    _LOGGER.info(f"Unable to reverse geocode for address-{loc}")
+                except Exception as e:
+                    _LOGGER.info(f"Unable to reverse geocode for address-{loc}. Got error-{e}")
                     location = loc
 
                 ## Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
@@ -306,13 +317,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 op_tuples.append(op)
 
             self.lightning_data = op_tuples
-
             return
 
         # Update mareo data
         def update_mareo_data():
             """Get the latest mareograph forecast data from FMI and update the states."""
 
+            _LOGGER.debug(f"FMI: mareo started")
             ## Format datetime to string accepted as path parameter in REST
             start_time = datetime.today()
             start_time = str(start_time).split(".")[0]
@@ -348,9 +359,12 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
             else:
                 _LOGGER.debug("FMI: Mareo_data not updated. No data available!")
+            
+            _LOGGER.debug(f"FMI: mareo ended")
+            return
 
         try:
-            async with timeout(10):
+            async with timeout(30):
                 self.current = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
                 self.forecast = await fmi.async_forecast_by_coordinates(self.latitude, self.longitude, self.time_step)
 
@@ -375,19 +389,3 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         except (ClientError, ServerError) as error:
             raise UpdateFailed(error) from error
         return {}
-
-
-def get_weather_symbol(symbol, hass=None):
-    """Get a weather symbol for the symbol value."""
-    ret_val = ""
-    if symbol in FMI_WEATHER_SYMBOL_MAP.keys():
-        ret_val = FMI_WEATHER_SYMBOL_MAP[symbol]
-        if hass is not None and ret_val == 1:  # Clear as per FMI
-            today = date.today()
-            sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, today)
-            sunset = sunset.astimezone(tz.tzlocal())
-
-            if datetime.now().astimezone(tz.tzlocal()) >= sunset:
-                # Clear night
-                ret_val = FMI_WEATHER_SYMBOL_MAP[0]
-    return ret_val
