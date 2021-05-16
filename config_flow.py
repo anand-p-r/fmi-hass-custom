@@ -10,6 +10,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
 from . import base_unique_id
+
 from .const import (
     _LOGGER,
     FORECAST_OFFSET,
