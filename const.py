@@ -8,6 +8,9 @@ _LOGGER = logging.getLogger(__package__)
 DOMAIN = "fmi"
 NAME = "FMI"
 MANUFACTURER = "Finnish Meteorological Institute"
+TIMEOUT_FMI_INTEG_IN_SEC = 30
+TIMEOUT_LIGHTNING_PULL_IN_SECS = 5
+TIMEOUT_MAREO_PULL_IN_SECS = 5
 
 COORDINATOR = "coordinator"
 MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=30)
@@ -46,7 +49,7 @@ BEST_CONDITION_AVAIL = "available"
 BEST_CONDITION_NOT_AVAIL = "not_available"
 
 # Constants for Lightning strikes
-BOUNDING_BOX_RADIUS = 2500
+BOUNDING_BOX_HALF_DIST = 2500
 LIGHTNING_LIMIT = 5
 BASE_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::lightning::multipointcoverage&timestep=3600&"
 

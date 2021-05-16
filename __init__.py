@@ -45,7 +45,10 @@ from .const import (
     BASE_URL,
     LIGHTNING_LIMIT,
     BASE_MAREO_FORC_URL,
-    BOUNDING_BOX_HALF_DIST
+    BOUNDING_BOX_HALF_DIST,
+    TIMEOUT_FMI_INTEG_IN_SEC,
+    TIMEOUT_LIGHTNING_PULL_IN_SECS,
+    TIMEOUT_MAREO_PULL_IN_SECS
 )
 
 from .utils import (
@@ -256,7 +259,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"FMI: Lightning URI - {base_url}")
 
             ## Fetch data
-            response = requests.get(base_url, timeout=5)
+            response = requests.get(base_url, timeout=TIMEOUT_LIGHTNING_PULL_IN_SECS)
             root = ET.fromstring(response.content)
             for child in root.iter():
                 if child.tag.find("positions") > 0:
@@ -337,7 +340,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("FMI: Using Mareo url: %s", base_mareo_url)
 
             ## Fetch data
-            response_mareo = requests.get(base_mareo_url)
+            response_mareo = requests.get(base_mareo_url, timeout=TIMEOUT_MAREO_PULL_IN_SECS)
 
             root_mareo = ET.fromstring(response_mareo.content)
 
@@ -364,7 +367,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             return
 
         try:
-            async with timeout(30):
+            async with timeout(TIMEOUT_FMI_INTEG_IN_SEC):
                 self.current = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
                 self.forecast = await fmi.async_forecast_by_coordinates(self.latitude, self.longitude, self.time_step)
 
