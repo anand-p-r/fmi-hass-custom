@@ -2,11 +2,6 @@
 
 from datetime import datetime
 from dateutil import tz
-import requests
-import time
-import xml.etree.ElementTree as ET
-from geopy.distance import geodesic
-from geopy.geocoders import Nominatim
 
 # Import homeassistant platform dependencies
 from homeassistant.const import (
@@ -16,13 +11,10 @@ from homeassistant.const import (
     ATTR_TIME,
     SPEED_METERS_PER_SECOND,
     TEMP_CELSIUS,
-    PERCENTAGE,
-    DEGREE
+    PERCENTAGE
 )
 
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.entity import Entity
-from homeassistant.util import Throttle
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -32,14 +24,11 @@ from .const import (
     ATTR_HUMIDITY,
     ATTR_WIND_SPEED,
     ATTR_PRECIPITATION,
-    BASE_URL,
-    LIGHTNING_LIMIT,
     ATTR_DISTANCE,
     ATTR_STRIKES,
     ATTR_PEAK_CURRENT,
     ATTR_CLOUD_COVER,
     ATTR_ELLIPSE_MAJOR,
-    BASE_MAREO_FORC_URL,
     COORDINATOR
 )
 

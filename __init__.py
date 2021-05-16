@@ -241,6 +241,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         def update_lightning_strikes():
             """Get the latest data from FMI and update the states."""
 
+            _LOGGER.debug(f"FMI: Lightning started")
             loc_time_list = []
             home_cords = (self.latitude, self.longitude)
 
@@ -295,7 +296,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             ## First sort for closes entries and filter to limit
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[3])) ## distance
-            _LOGGER.debug(f"FMI - total coords - {len(loc_time_list)}")
+            _LOGGER.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
 
             loc_time_list = loc_time_list[:LIGHTNING_LIMIT]
 
@@ -320,6 +321,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 op_tuples.append(op)
 
             self.lightning_data = op_tuples
+            _LOGGER.debug(f"FMI: Lightning ended")
             return
 
         # Update mareo data
