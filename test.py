@@ -38,5 +38,8 @@ def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km)
 
 
 if __name__ == "__main__":
-    box = get_bounding_box(60.251515, 24.777256, 2500)
-    print(f"{box.lat_min},{box.lon_min},{box.lat_max},{box.lon_max}")
+    lat = 61.55289772079975
+    lon = 23.78579634262166
+    box = get_bounding_box(lat, lon, 750)
+    print(f"&bbox={box.lon_min},{box.lat_min},{box.lon_max},{box.lat_max}&")
+    print(f"for gmaps: {box.lat_min}, {box.lon_min}  {box.lat_max}, {box.lon_max}")
