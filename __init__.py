@@ -1,54 +1,33 @@
 """The FMI (Finnish Meteorological Institute) component."""
 
-from datetime import date, datetime, timedelta
-
-from async_timeout import timeout
-
-import requests
 import time
 import xml.etree.ElementTree as ET
+from datetime import date, datetime, timedelta
+
+import fmi_weather_client as fmi
+import requests
+from async_timeout import timeout
+from dateutil import tz
+from fmi_weather_client.errors import ClientError, ServerError
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
-
-from dateutil import tz
-import fmi_weather_client as fmi
-from fmi_weather_client.errors import ClientError, ServerError
-
-from homeassistant.const import (
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
-    CONF_OFFSET
-)
-
+from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import Config, HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
+                                                      UpdateFailed)
 
 from .const import (
-    _LOGGER,
-    COORDINATOR,
-    DOMAIN,
-    MIN_TIME_BETWEEN_UPDATES,
-    UNDO_UPDATE_LISTENER,
-    CONF_MIN_HUMIDITY,
-    CONF_MAX_HUMIDITY,
-    CONF_MIN_TEMP,
-    CONF_MAX_TEMP,
-    CONF_MIN_WIND_SPEED,
-    CONF_MAX_WIND_SPEED,
-    CONF_MIN_PRECIPITATION,
-    CONF_MAX_PRECIPITATION,
-    BEST_CONDITION_AVAIL,
-    BEST_CONDITION_NOT_AVAIL,
-    BEST_COND_SYMBOLS,
-    BASE_URL,
-    LIGHTNING_LIMIT,
-    BASE_MAREO_FORC_URL,
-    BOUNDING_BOX_HALF_DIST,
-    TIMEOUT_FMI_INTEG_IN_SEC,
-    TIMEOUT_LIGHTNING_PULL_IN_SECS,
-    TIMEOUT_MAREO_PULL_IN_SECS
+    _LOGGER, BASE_MAREO_FORC_URL, BASE_URL, BEST_COND_SYMBOLS,
+    BEST_CONDITION_AVAIL, BEST_CONDITION_NOT_AVAIL,
+    LIGHTNING_DAYS_LIMIT, CONF_MAX_HUMIDITY,
+    CONF_MAX_PRECIPITATION, CONF_MAX_TEMP, CONF_MAX_WIND_SPEED,
+    CONF_MIN_HUMIDITY, CONF_MIN_PRECIPITATION, CONF_MIN_TEMP,
+    CONF_MIN_WIND_SPEED, COORDINATOR, DOMAIN, LIGHTNING_LIMIT,
+    MIN_TIME_BETWEEN_UPDATES, TIMEOUT_FMI_INTEG_IN_SEC,
+    TIMEOUT_LIGHTNING_PULL_IN_SECS, TIMEOUT_MAREO_PULL_IN_SECS,
+    UNDO_UPDATE_LISTENER, BOUNDING_BOX_HALF_SIDE_KM
 )
 
 from .utils import (
@@ -245,7 +224,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             loc_time_list = []
             home_cords = (self.latitude, self.longitude)
 
-            start_time = datetime.today() - timedelta(days=7)
+            start_time = datetime.today() - timedelta(days=LIGHTNING_DAYS_LIMIT)
 
             ## Format datetime to string accepted as path parameter in REST
             start_time = str(start_time).split(".")[0]
@@ -253,8 +232,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             start_time_uri_param = f"starttime={str(start_time.date())}T{str(start_time.time())}Z&"
 
             ## Get Bounding Box coords
-            bbox_coords = get_bounding_box(self.latitude, self.longitude, BOUNDING_BOX_HALF_DIST)
-            bbox_uri_param = f"bbox={bbox_coords.lat_min},{bbox_coords.lon_min},{bbox_coords.lat_max},{bbox_coords.lon_max}&"
+            bbox_coords = get_bounding_box(self.latitude, self.longitude, half_side_in_km=BOUNDING_BOX_HALF_SIDE_KM)
+            bbox_uri_param = f"bbox={bbox_coords.lon_min},{bbox_coords.lat_min},{bbox_coords.lon_max},{bbox_coords.lat_max}&"
 
             base_url = BASE_URL + start_time_uri_param + bbox_uri_param
             _LOGGER.debug(f"FMI: Lightning URI - {base_url}")
@@ -262,6 +241,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             ## Fetch data
             response = requests.get(base_url, timeout=TIMEOUT_LIGHTNING_PULL_IN_SECS)
             root = ET.fromstring(response.content)
+            loop_start_time = datetime.now()
             for child in root.iter():
                 if child.tag.find("positions") > 0:
                     clean_text = child.text.lstrip()
@@ -296,8 +276,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             ## First sort for closes entries and filter to limit
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[3])) ## distance
+            loop_end_time = datetime.now()
             _LOGGER.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
-
+            
             loc_time_list = loc_time_list[:LIGHTNING_LIMIT]
 
             ## Second Sort based on date
@@ -306,6 +287,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             geolocator = Nominatim(user_agent="fmi_hassio_sensor")
             
             ## Reverse geocoding
+            loop_start_time = datetime.now()
             op_tuples = []
             for indx, v in enumerate(loc_time_list):
                 loc = str(v[0]) + ", " + str(v[1])
@@ -319,7 +301,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 ## Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
                 op = FMILightningStruct(time_val=loc_time, location=location, distance=v[3], strikes=v[4], peak_current=v[5], cloud_cover=v[6], ellipse_major=v[7])
                 op_tuples.append(op)
-
+            loop_end_time = datetime.now()
             self.lightning_data = op_tuples
             _LOGGER.debug(f"FMI: Lightning ended")
             return

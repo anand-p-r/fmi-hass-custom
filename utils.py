@@ -3,7 +3,7 @@
 import math
 from datetime import date, datetime
 from dateutil import tz
-from .const import FMI_WEATHER_SYMBOL_MAP
+from .const import BOUNDING_BOX_LAT_MAX, BOUNDING_BOX_LAT_MIN, BOUNDING_BOX_LONG_MAX, BOUNDING_BOX_LONG_MIN, FMI_WEATHER_SYMBOL_MAP
 from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.const import SUN_EVENT_SUNSET
 
@@ -14,6 +14,16 @@ class BoundingBox(object):
         self.lon_min = None
         self.lat_max = None
         self.lon_max = None
+
+
+def get_bounding_box_covering_finland():
+    box = BoundingBox()
+    box.lat_min = BOUNDING_BOX_LAT_MIN
+    box.lon_min = BOUNDING_BOX_LONG_MIN
+    box.lat_max = BOUNDING_BOX_LAT_MAX
+    box.lon_max = BOUNDING_BOX_LONG_MAX
+
+    return box
 
 
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
