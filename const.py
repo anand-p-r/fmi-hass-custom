@@ -4,6 +4,7 @@ from datetime import timedelta
 import logging
 
 _LOGGER = logging.getLogger(__package__)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 DOMAIN = "fmi"
 NAME = "FMI"
@@ -54,7 +55,7 @@ BOUNDING_BOX_LONG_MIN = 15.311937
 BOUNDING_BOX_LAT_MAX = 70.440000
 BOUNDING_BOX_LONG_MAX = 39.262133
 BOUNDING_BOX_HALF_SIDE_KM = 1000
-LIGHTNING_DAYS_LIMIT = 5
+LIGHTNING_DAYS_LIMIT = 1
 LIGHTNING_LIMIT = 5
 
 BASE_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::lightning::multipointcoverage&timestep=3600&"
