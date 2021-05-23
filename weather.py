@@ -10,11 +10,13 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_WIND_SPEED,
     ATTR_WEATHER_HUMIDITY,
     ATTR_WEATHER_PRESSURE,
+    ATTR_FORECAST_TEMP_LOW,
     WeatherEntity,
 )
 
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from .const import CONF_DAILY_MODE
 
 from .utils import (
     get_weather_symbol
@@ -31,22 +33,24 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
     name = config_entry.data[CONF_NAME]
+    daily_mode = config_entry.options.get(CONF_DAILY_MODE, False)
 
     coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
 
-    async_add_entities([FMIWeatherEntity(name, coordinator)], False)
+    async_add_entities([FMIWeatherEntity(name, coordinator, daily_mode)], False)
 
 
 class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     """Define an FMI Weather Entity."""
 
-    def __init__(self, name, coordinator):
+    def __init__(self, name, coordinator, daily_mode):
         """Initialize FMI weather object."""
         super().__init__(coordinator)
         self._name = name
         self._attrs = {}
         self._unit_system = "Metric"
         self._fmi = coordinator
+        self._daily_mode = daily_mode
 
     @property
     def name(self):
@@ -166,19 +170,44 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         if self._fmi.forecast is None:
             return None
 
-        data = [
-            {
-                ATTR_FORECAST_TIME: forecast.time.astimezone(tz.tzlocal()),
-                ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
-                ATTR_FORECAST_TEMP: forecast.temperature.value,
-                ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
-                ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
-                ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-            }
-            for forecast in self._fmi.forecast.forecasts
-        ]
+        if self._daily_mode:
+            # Daily mode, aggregate forecast for every day
+            day = 0
+            data = []
+            for forecast in self._fmi.forecast.forecasts:
+                if day != forecast.time.day:
+                    day = forecast.time.day
+                    data.append({
+                        ATTR_FORECAST_TIME: forecast.time.astimezone(tz.tzlocal()),
+                        ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
+                        ATTR_FORECAST_TEMP: forecast.temperature.value,
+                        ATTR_FORECAST_TEMP_LOW: forecast.temperature.value,
+                        ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
+                        ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                        ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                        ATTR_WEATHER_PRESSURE: forecast.pressure.value,
+                        ATTR_WEATHER_HUMIDITY: forecast.humidity.value
+                    })
+                else:
+                    if data[-1][ATTR_FORECAST_TEMP] < forecast.temperature.value:
+                        data[-1][ATTR_FORECAST_TEMP] = forecast.temperature.value
+                    if data[-1][ATTR_FORECAST_TEMP_LOW] > forecast.temperature.value:
+                        data[-1][ATTR_FORECAST_TEMP_LOW] = forecast.temperature.value
+        else:
+            data = [
+                {
+                    ATTR_FORECAST_TIME: forecast.time.astimezone(tz.tzlocal()),
+                    ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
+                    ATTR_FORECAST_TEMP: forecast.temperature.value,
+                    ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
+                    ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                    ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                    ATTR_WEATHER_PRESSURE: forecast.pressure.value,
+                    ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                    
+                }
+                for forecast in self._fmi.forecast.forecasts
+            ]
 
         #_LOGGER.debug("FMI: Forecast data: %s", data)
 
