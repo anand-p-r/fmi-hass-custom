@@ -175,10 +175,11 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             day = 0
             data = []
             for forecast in self._fmi.forecast.forecasts:
-                if day != forecast.time.day:
-                    day = forecast.time.day
+                time = forecast.time.astimezone(tz.tzlocal())
+                if day != time.day:
+                    day = time.day
                     data.append({
-                        ATTR_FORECAST_TIME: forecast.time.astimezone(tz.tzlocal()),
+                        ATTR_FORECAST_TIME: time,
                         ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
                         ATTR_FORECAST_TEMP: forecast.temperature.value,
                         ATTR_FORECAST_TEMP_LOW: forecast.temperature.value,
