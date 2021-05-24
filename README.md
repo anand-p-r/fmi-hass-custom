@@ -27,5 +27,7 @@ In addition to the weather platform, default sensors include different weather c
 
 Based on the latitude and longitude, location name is derived by reverse geo-coding. Sensors are then grouped based on the derived location name. For e.g. ```weather.<place_name>```,  ```sensor.<place_name>_temperature```, ```sensor.<place_name>_humidity``` etc.
 
+Integration options (Configuration --> Integrations --> <Weather Location> --> Configure) include Forecast Interval and other Weather Parameters. These weather parameters are used to determine the "Best Time Of The Day". Additionally there is an option to set "Daily mode" that will provide a view of max and min temperatures for the forecasts.
+
 ## Original Author
 Anand Radhakrishnan [@anand-p-r](https://github.com/anand-p-r)

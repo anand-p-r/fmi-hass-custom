@@ -22,6 +22,7 @@ from .const import (
     CONF_MAX_WIND_SPEED,
     CONF_MIN_PRECIPITATION,
     CONF_MAX_PRECIPITATION,
+    CONF_DAILY_MODE,
     HUMIDITY_RANGE,
     TEMP_RANGE,
     WIND_SPEED
@@ -154,6 +155,8 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_MIN_PRECIPITATION, 0.0)): cv.small_float,
                 vol.Optional(CONF_MAX_PRECIPITATION, default=self.config_entry.options.get(
                     CONF_MAX_PRECIPITATION, 0.2)): cv.small_float,
+                vol.Optional(CONF_DAILY_MODE, default=self.config_entry.options.get(
+                    CONF_DAILY_MODE, False)): cv.boolean,
                 }
             )
         )

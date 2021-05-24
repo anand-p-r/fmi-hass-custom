@@ -25,6 +25,7 @@ CONF_MIN_WIND_SPEED = "min_wind_speed"
 CONF_MAX_WIND_SPEED = "max_wind_speed"
 CONF_MIN_PRECIPITATION = "min_precipitation"
 CONF_MAX_PRECIPITATION = "max_precipitation"
+CONF_DAILY_MODE = "daily_mode"
 
 HUMIDITY_RANGE = list(range(1, 101))
 TEMP_RANGE = list(range(-40, 50))

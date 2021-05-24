@@ -24,7 +24,7 @@ from .const import (
     LIGHTNING_DAYS_LIMIT, CONF_MAX_HUMIDITY,
     CONF_MAX_PRECIPITATION, CONF_MAX_TEMP, CONF_MAX_WIND_SPEED,
     CONF_MIN_HUMIDITY, CONF_MIN_PRECIPITATION, CONF_MIN_TEMP,
-    CONF_MIN_WIND_SPEED, COORDINATOR, DOMAIN, LIGHTNING_LIMIT,
+    CONF_MIN_WIND_SPEED, CONF_DAILY_MODE, COORDINATOR, DOMAIN, LIGHTNING_LIMIT,
     MIN_TIME_BETWEEN_UPDATES, TIMEOUT_FMI_INTEG_IN_SEC,
     TIMEOUT_LIGHTNING_PULL_IN_SECS, TIMEOUT_MAREO_PULL_IN_SECS,
     UNDO_UPDATE_LISTENER, BOUNDING_BOX_HALF_SIDE_KM
@@ -134,6 +134,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.max_wind_speed = float(config_entry.options.get(CONF_MAX_WIND_SPEED, 25))
         self.min_precip = float(config_entry.options.get(CONF_MIN_PRECIPITATION, 0.0))
         self.max_precip = float(config_entry.options.get(CONF_MAX_PRECIPITATION, 0.2))
+        self.daily_mode = bool(config_entry.options.get(CONF_DAILY_MODE, False))
 
         self.current = None
         self.forecast = None

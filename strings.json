@@ -33,7 +33,8 @@
           "min_wind_speed": "Min Wind Speed",
           "max_wind_speed": "Max Wind Speed",
           "min_precipitation": "Min Precipitation",
-          "max_precipitation": "Max Precipitation"          
+          "max_precipitation": "Max Precipitation",
+          "daily_mode": "Daily mode"
         }
       }
     }
