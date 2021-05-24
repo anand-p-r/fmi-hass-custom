@@ -31,7 +31,8 @@
                     "min_relative_humidity": "Min Relative Humidity",
                     "min_temperature": "Min Temperature",
                     "min_wind_speed": "Min Wind Speed",
-                    "offset": "Forecast Interval"
+                    "offset": "Forecast Interval",
+                    "daily_mode": "Daily mode"
                 },
                 "description": "FMI Configuration Parameters",
                 "title": "FMI Options"
