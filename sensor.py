@@ -268,9 +268,9 @@ class FMILightningStrikesSensor(CoordinatorEntity):
         self._icon = "mdi:weather-lightning"
         self.type = sensor_type
         self._unit_of_measurement = SENSOR_LIGHTNING_TYPES[sensor_type][1]
-        self.lightning_data = coordinator.lightning_data
         self._fmi = coordinator
-
+        self.lightning_data = coordinator.lightning_data
+        
         try:
             self._fmi_name = coordinator.current.place
         except:
@@ -342,6 +342,8 @@ class FMILightningStrikesSensor(CoordinatorEntity):
         """Get the latest data from FMI and updates the states."""
 
         self._fmi.async_request_refresh()
+        self.lightning_data = self._fmi.lightning_data
+
         try:
             self._state = self.lightning_data[0].location
         except:
