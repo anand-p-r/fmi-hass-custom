@@ -335,8 +335,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                         tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
                         sealevel_tuple_list.append(tuple_to_add)
                     else:
-                        _LOGGER.debug("Sealevel forecast record mismatch - aborting query!")
-                        break
+                        _LOGGER.debug("Sealevel forecast unsupported record: %s", root_mareo[n][0][2].text)
+                        continue
                 except:
                     _LOGGER.debug(f"Sealevel forecast records not in expected format for index - {n} of locstring - {loc_string}")
 
