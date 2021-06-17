@@ -305,7 +305,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             loop_end_time = datetime.now()
             self.lightning_data = op_tuples
             _LOGGER.debug(f"FMI: Lightning ended")
-            return
 
         # Update mareo data
         def update_mareo_data():

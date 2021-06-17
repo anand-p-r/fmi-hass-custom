@@ -140,6 +140,10 @@ class FMIBestConditionSensor(CoordinatorEntity):
         return self._name
 
     @property
+    def unique_id(self):
+        f"{self.coordinator.unique_id}_{self.name}"
+
+    @property
     def state(self):
         """Return the state of the sensor."""
 
@@ -176,13 +180,9 @@ class FMIBestConditionSensor(CoordinatorEntity):
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
-
         if self._fmi is None:
             _LOGGER.debug("FMI: Coordinator is not available")
             return
-
-        # Refresh data from API call.
-        self._fmi.async_request_refresh()
 
         if self._fmi.current is None:
             _LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
@@ -278,7 +278,6 @@ class FMILightningStrikesSensor(CoordinatorEntity):
 
         self.update()
 
-
     @property
     def name(self):
         """Return the name of the sensor."""
@@ -330,18 +329,16 @@ class FMILightningStrikesSensor(CoordinatorEntity):
                     ATTR_STRIKES: strike.strikes,
                     ATTR_PEAK_CURRENT: strike.peak_current,
                     ATTR_CLOUD_COVER: strike.cloud_cover,
-                    ATTR_ELLIPSE_MAJOR: strike.ellipse_major
+                    ATTR_ELLIPSE_MAJOR: strike.ellipse_major,
                 }
                 for strike in self.lightning_data[1:]
             ],
-            ATTR_ATTRIBUTION: ATTRIBUTION
+            ATTR_ATTRIBUTION: ATTRIBUTION,
         }
-
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
 
-        self._fmi.async_request_refresh()
         try:
             self._state = self.lightning_data[0].location
         except:
@@ -349,6 +346,7 @@ class FMILightningStrikesSensor(CoordinatorEntity):
             self._state = "Unavailable"
 
         return
+
 
 class FMIMareoSensor(CoordinatorEntity):
     """Implementation of a FMI sea water level sensor."""
@@ -370,7 +368,6 @@ class FMIMareoSensor(CoordinatorEntity):
             self._fmi_name = None
 
         self.update()
-
 
     @property
     def name(self):
@@ -421,20 +418,14 @@ class FMIMareoSensor(CoordinatorEntity):
         return {
             ATTR_TIME: mareo_data[0][0],
             "FORECASTS": [
-                {
-                    "time": item[0],
-                    "height": item[1]
-                }
-                for item in mareo_data[1:]
+                {"time": item[0], "height": item[1]} for item in mareo_data[1:]
             ],
-            ATTR_ATTRIBUTION: ATTRIBUTION
+            ATTR_ATTRIBUTION: ATTRIBUTION,
         }
-
 
     def update(self):
         """Get the latest data from FMI and updates the states."""
 
-        self._fmi.async_request_refresh()
         mareo_data = self._fmi.mareo_data.sea_levels
 
         try:
