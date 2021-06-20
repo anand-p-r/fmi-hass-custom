@@ -37,7 +37,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
 
-    async_add_entities([FMIWeatherEntity(name, coordinator, daily_mode)], False)
+    entity_list = [FMIWeatherEntity(name, coordinator, False)]
+    if daily_mode:
+        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator, True))
+
+    async_add_entities(entity_list, False)
 
 
 class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
@@ -51,16 +55,20 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         self._unit_system = "Metric"
         self._fmi = coordinator
         self._daily_mode = daily_mode
+        self._id = (
+            self.coordinator.unique_id
+            if not daily_mode
+            else f"{self.coordinator.unique_id}_daily"
+        )
 
     @property
     def name(self):
         """Return the name of the place based on Lat/Long."""
-        if self._fmi is None:
+        if self._fmi is None or self._fmi.current is None:
             return self._name
 
-        if self._fmi.current is None:
-            return self._name
-
+        if self._daily_mode:
+            return f"{self._fmi.current.place} (daily)"
         return self._fmi.current.place
 
     @property
@@ -71,7 +79,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     @property
     def unique_id(self):
         """Return a unique_id for this entity."""
-        return self.coordinator.unique_id
+        return self._id
 
     @property
     def device_info(self):
@@ -164,9 +172,6 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             _LOGGER.debug("FMI: Coordinator is not available!")
             return None
 
-        # Get latest weather data from API call
-        self._fmi.async_request_refresh()
-
         if self._fmi.forecast is None:
             return None
 
@@ -205,11 +210,8 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
                     ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                     ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-                    
                 }
                 for forecast in self._fmi.forecast.forecasts
             ]
-
-        #_LOGGER.debug("FMI: Forecast data: %s", data)
 
         return data
