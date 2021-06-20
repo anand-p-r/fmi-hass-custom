@@ -279,14 +279,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[3])) ## distance
             loop_end_time = datetime.now()
             _LOGGER.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
-            
+
             loc_time_list = loc_time_list[:LIGHTNING_LIMIT]
 
             ## Second Sort based on date
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[2]), reverse=True)  ## date
 
             geolocator = Nominatim(user_agent="fmi_hassio_sensor")
-            
+
             ## Reverse geocoding
             loop_start_time = datetime.now()
             op_tuples = []
@@ -334,6 +334,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     if root_mareo[n][0][2].text == 'SeaLevel':
                         tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
                         sealevel_tuple_list.append(tuple_to_add)
+                    elif root_mareo[n][0][2].text == 'SeaLevelN2000':
+                        continue
                     else:
                         _LOGGER.debug("Sealevel forecast unsupported record: %s", root_mareo[n][0][2].text)
                         continue
@@ -346,7 +348,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
             else:
                 _LOGGER.debug("FMI: Mareo_data not updated. No data available!")
-            
+
             _LOGGER.debug(f"FMI: mareo ended")
             return
 
