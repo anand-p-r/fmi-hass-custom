@@ -27,7 +27,8 @@ from .const import (
     CONF_MIN_WIND_SPEED, CONF_DAILY_MODE, COORDINATOR, DOMAIN, LIGHTNING_LIMIT,
     MIN_TIME_BETWEEN_UPDATES, TIMEOUT_FMI_INTEG_IN_SEC,
     TIMEOUT_LIGHTNING_PULL_IN_SECS, TIMEOUT_MAREO_PULL_IN_SECS,
-    UNDO_UPDATE_LISTENER, BOUNDING_BOX_HALF_SIDE_KM
+    UNDO_UPDATE_LISTENER, BOUNDING_BOX_HALF_SIDE_KM,
+    LIGHTNING_LOOP_TIMEOUT_IN_SECS, CONF_LIGHTNING,
 )
 
 from .utils import (
@@ -135,7 +136,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.min_precip = float(config_entry.options.get(CONF_MIN_PRECIPITATION, 0.0))
         self.max_precip = float(config_entry.options.get(CONF_MAX_PRECIPITATION, 0.2))
         self.daily_mode = bool(config_entry.options.get(CONF_DAILY_MODE, False))
-
+        self.lightning_mode = bool(config_entry.options.get(CONF_LIGHTNING, False))
+        
         self.current = None
         self.forecast = None
         self._hass = hass
@@ -242,7 +244,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             ## Fetch data
             response = requests.get(base_url, timeout=TIMEOUT_LIGHTNING_PULL_IN_SECS)
             root = ET.fromstring(response.content)
-            loop_start_time = datetime.now()
+            loop_timeout = time.time() + (LIGHTNING_LOOP_TIMEOUT_IN_SECS*1000)
             for child in root.iter():
                 if child.tag.find("positions") > 0:
                     clean_text = child.text.lstrip()
@@ -261,6 +263,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                             add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_indx)
                             loc_time_list.append(add_tuple)
                             num_locs += 1
+                            
+                            if time.time() > loop_timeout:
+                                break
+                        
                 elif child.tag.find("doubleOrNilReasonTupleList") > 0:
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
@@ -271,13 +277,16 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                             if indx == exist_tuple[4]:
                                 add_tuple = (exist_tuple[0], exist_tuple[1], exist_tuple[2], exist_tuple[3], val_split[0], val_split[1], val_split[2], val_split[3])
                                 loc_time_list[indx] = add_tuple
+
+                                if time.time() > loop_timeout:
+                                    break
+
                             else:
                                 print("Record mismtach - aborting query!")
                                 break
 
             ## First sort for closes entries and filter to limit
             loc_time_list = sorted(loc_time_list, key=(lambda item: item[3])) ## distance
-            loop_end_time = datetime.now()
             _LOGGER.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
 
             loc_time_list = loc_time_list[:LIGHTNING_LIMIT]
@@ -364,10 +373,11 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("FMI: Best Conditions updated!")
 
                 # Update lightning strikes
-                await self._hass.async_add_executor_job(
-                    update_lightning_strikes
-                )
-                _LOGGER.debug("FMI: Lightning Conditions updated!")
+                if self.lightning_mode:
+                    await self._hass.async_add_executor_job(
+                        update_lightning_strikes
+                    )
+                    _LOGGER.debug("FMI: Lightning Conditions updated!")
 
                 # Update mareograph data on sea level
                 await self._hass.async_add_executor_job(
