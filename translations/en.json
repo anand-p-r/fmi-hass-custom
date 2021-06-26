@@ -32,7 +32,8 @@
                     "min_temperature": "Min Temperature",
                     "min_wind_speed": "Min Wind Speed",
                     "offset": "Forecast Interval",
-                    "daily_mode": "Daily mode"
+                    "daily_mode": "Daily mode",
+                    "lightning_sensor": "Lightning sensor"
                 },
                 "description": "FMI Configuration Parameters",
                 "title": "FMI Options"
