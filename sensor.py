@@ -164,7 +164,7 @@ class FMIBestConditionSensor(CoordinatorEntity):
         return self._unit_of_measurement
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         if self.type == "time":
             if self._fmi is not None:
@@ -308,7 +308,7 @@ class FMILightningStrikesSensor(CoordinatorEntity):
         return self._icon
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         if self.lightning_data is None:
             return []
@@ -399,7 +399,7 @@ class FMIMareoSensor(CoordinatorEntity):
         return self._icon
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
 
         mareo_data = self._fmi.mareo_data.sea_levels
