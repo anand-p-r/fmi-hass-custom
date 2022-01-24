@@ -3,9 +3,15 @@
 import math
 from datetime import date, datetime
 from dateutil import tz
-from .const import BOUNDING_BOX_LAT_MAX, BOUNDING_BOX_LAT_MIN, BOUNDING_BOX_LONG_MAX, BOUNDING_BOX_LONG_MIN, FMI_WEATHER_SYMBOL_MAP
+from .const import (
+    BOUNDING_BOX_LAT_MAX,
+    BOUNDING_BOX_LAT_MIN,
+    BOUNDING_BOX_LONG_MAX,
+    BOUNDING_BOX_LONG_MIN,
+    FMI_WEATHER_SYMBOL_MAP,
+)
 from homeassistant.helpers.sun import get_astral_event_date
-from homeassistant.const import SUN_EVENT_SUNSET
+from homeassistant.const import SUN_EVENT_SUNSET, SUN_EVENT_SUNRISE
 
 
 class BoundingBox(object):
@@ -28,20 +34,20 @@ def get_bounding_box_covering_finland():
 
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
     assert half_side_in_km > 0
-    assert latitude_in_degrees >= -90.0 and latitude_in_degrees  <= 90.0
+    assert latitude_in_degrees >= -90.0 and latitude_in_degrees <= 90.0
     assert longitude_in_degrees >= -180.0 and longitude_in_degrees <= 180.0
 
     lat = math.radians(latitude_in_degrees)
     lon = math.radians(longitude_in_degrees)
 
-    radius  = 6371
+    radius = 6371
     # Radius of the parallel at given latitude
-    parallel_radius = radius*math.cos(lat)
+    parallel_radius = radius * math.cos(lat)
 
-    lat_min = lat - half_side_in_km/radius  
-    lat_max = lat + half_side_in_km/radius
-    lon_min = lon - half_side_in_km/parallel_radius
-    lon_max = lon + half_side_in_km/parallel_radius
+    lat_min = lat - half_side_in_km / radius
+    lat_max = lat + half_side_in_km / radius
+    lon_min = lon - half_side_in_km / parallel_radius
+    lon_max = lon + half_side_in_km / parallel_radius
     rad2deg = math.degrees
 
     box = BoundingBox()
@@ -63,7 +69,12 @@ def get_weather_symbol(symbol, hass=None):
             sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, today)
             sunset = sunset.astimezone(tz.tzlocal())
 
-            if datetime.now().astimezone(tz.tzlocal()) >= sunset:
+            sunrise = get_astral_event_date(hass, SUN_EVENT_SUNRISE, today)
+            sunrise = sunrise.astimezone(tz.tzlocal())
+
+            if (datetime.now().astimezone(tz.tzlocal()) <= sunrise) or (
+                datetime.now().astimezone(tz.tzlocal()) >= sunset
+            ):
                 # Clear night
                 ret_val = FMI_WEATHER_SYMBOL_MAP[0]
     return ret_val
