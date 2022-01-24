@@ -16,10 +16,10 @@ Follow these instructions if an older version of the component was in use
     1. Using a tool of choice open the directory (folder) for HA configuration (where you find configuration YAML file).
     2. If `custom_components` directory does not exist, create one.
     3. In the `custom_components` directory create a new folder called `fmi`.
-    4. Download all the files from the this repository and place the files in the new directory created.
-    5. Restart Home Assistant
-    6. Install integration from UI (Configuration --> Intergations --> + --> Search for fmi)
-    7. Specify the latitude and longitude (default values are picked from the Home Assistant configuration)
+    4. Download all the files from the this repository and place the files in the new directory created. If using `git clone` command, ensure that the local directory is renamed from `fmi-hass-custom` to `fmi`. Either way, all files of the repo/download should be in `<HA configuration location>/custom_components/fmi/`.
+    1. Restart Home Assistant.
+    2. Install integration from UI (Configuration --> Intergations --> + --> Search for fmi).
+    3. Specify the latitude and longitude (default values are picked from the Home Assistant configuration).
 
 ## Weather and Sensors
 
