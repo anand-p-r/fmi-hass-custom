@@ -14,7 +14,8 @@ from homeassistant.components.weather import (
     WeatherEntity,
 )
 
-from homeassistant.const import CONF_NAME
+from awesomeversion import AwesomeVersion
+from homeassistant.const import CONF_NAME, __version__ as HA_VERSION
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_DAILY_MODE
 
@@ -29,6 +30,7 @@ from .const import (
 
 PARALLEL_UPDATES = 1
 
+CURRENT_HA_VERSION = AwesomeVersion(HA_VERSION)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
@@ -84,12 +86,22 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     @property
     def device_info(self):
         """Return the device info."""
-        return {
+        info = {
             "identifiers": {(DOMAIN, self.coordinator.unique_id)},
             "name": NAME,
             "manufacturer": MANUFACTURER,
-            "entry_type": "service",
         }
+
+        # Legacy fallback can be removed when minimum required
+        # HA version is 2021.12.
+        if CURRENT_HA_VERSION >= "2021.12.0b0":
+            from homeassistant.helpers.device_registry import DeviceEntryType
+
+            info["entry_type"] = DeviceEntryType.SERVICE
+        else:
+            info["entry_type"] = "service"
+
+        return info
 
     @property
     def available(self):
