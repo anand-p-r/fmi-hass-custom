@@ -1,5 +1,6 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
 from dateutil import tz
+from datetime import time
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -188,9 +189,9 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             day = 0
             data = []
             for forecast in self._fmi.forecast.forecasts:
-                time = forecast.time.astimezone(tz.tzlocal())
-                if day != time.day:
-                    day = time.day
+                fc_time = forecast.time.astimezone(tz.tzlocal())
+                if day != fc_time.day:
+                    day = fc_time.day
                     data.append(
                         {
                             ATTR_FORECAST_TIME: time.isoformat(),
