@@ -212,9 +212,10 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     if data[-1][ATTR_FORECAST_TEMP_LOW] > forecast.temperature.value:
                         data[-1][ATTR_FORECAST_TEMP_LOW] = forecast.temperature.value
         else:
+            data = []
             for forecast in self._fmi.forecast.forecasts:
                 fc_time = forecast.time.astimezone(tz.tzlocal())
-                data = [
+                data.append(
                     {
                         ATTR_FORECAST_TIME: fc_time.isoformat(),
                         ATTR_FORECAST_CONDITION: get_weather_symbol(
@@ -227,6 +228,6 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                         ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                         ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
                     }
-                ]
+                )
 
         return data
