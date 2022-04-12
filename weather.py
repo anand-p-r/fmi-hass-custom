@@ -19,18 +19,14 @@ from homeassistant.const import CONF_NAME, __version__ as HA_VERSION
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_DAILY_MODE
 
-from .utils import (
-    get_weather_symbol
-)
+from .utils import get_weather_symbol
 
-from .const import (
-    _LOGGER, ATTRIBUTION, COORDINATOR, 
-    DOMAIN, MANUFACTURER, NAME
-)
+from .const import _LOGGER, ATTRIBUTION, COORDINATOR, DOMAIN, MANUFACTURER, NAME
 
 PARALLEL_UPDATES = 1
 
 CURRENT_HA_VERSION = AwesomeVersion(HA_VERSION)
+
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
@@ -195,17 +191,21 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                 time = forecast.time.astimezone(tz.tzlocal())
                 if day != time.day:
                     day = time.day
-                    data.append({
-                        ATTR_FORECAST_TIME: time,
-                        ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
-                        ATTR_FORECAST_TEMP: forecast.temperature.value,
-                        ATTR_FORECAST_TEMP_LOW: forecast.temperature.value,
-                        ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
-                        ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
-                        ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                        ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                        ATTR_WEATHER_HUMIDITY: forecast.humidity.value
-                    })
+                    data.append(
+                        {
+                            ATTR_FORECAST_TIME: time.isoformat(),
+                            ATTR_FORECAST_CONDITION: get_weather_symbol(
+                                forecast.symbol.value
+                            ),
+                            ATTR_FORECAST_TEMP: forecast.temperature.value,
+                            ATTR_FORECAST_TEMP_LOW: forecast.temperature.value,
+                            ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
+                            ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                            ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                            ATTR_WEATHER_PRESSURE: forecast.pressure.value,
+                            ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                        }
+                    )
                 else:
                     if data[-1][ATTR_FORECAST_TEMP] < forecast.temperature.value:
                         data[-1][ATTR_FORECAST_TEMP] = forecast.temperature.value
@@ -214,7 +214,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         else:
             data = [
                 {
-                    ATTR_FORECAST_TIME: forecast.time.astimezone(tz.tzlocal()),
+                    ATTR_FORECAST_TIME: time.isoformat(),
                     ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
                     ATTR_FORECAST_TEMP: forecast.temperature.value,
                     ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
