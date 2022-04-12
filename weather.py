@@ -1,6 +1,5 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
 from dateutil import tz
-from datetime import time
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -194,7 +193,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     day = fc_time.day
                     data.append(
                         {
-                            ATTR_FORECAST_TIME: time.isoformat(timespec="minutes"),
+                            ATTR_FORECAST_TIME: fc_time.isoformat(),
                             ATTR_FORECAST_CONDITION: get_weather_symbol(
                                 forecast.symbol.value
                             ),
@@ -213,18 +212,21 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     if data[-1][ATTR_FORECAST_TEMP_LOW] > forecast.temperature.value:
                         data[-1][ATTR_FORECAST_TEMP_LOW] = forecast.temperature.value
         else:
-            data = [
-                {
-                    ATTR_FORECAST_TIME: time.isoformat(timespec="minutes"),
-                    ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
-                    ATTR_FORECAST_TEMP: forecast.temperature.value,
-                    ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
-                    ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
-                    ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                    ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                    ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-                }
-                for forecast in self._fmi.forecast.forecasts
-            ]
+            for forecast in self._fmi.forecast.forecasts:
+                fc_time = forecast.time.astimezone(tz.tzlocal())
+                data = [
+                    {
+                        ATTR_FORECAST_TIME: fc_time.isoformat(),
+                        ATTR_FORECAST_CONDITION: get_weather_symbol(
+                            forecast.symbol.value
+                        ),
+                        ATTR_FORECAST_TEMP: forecast.temperature.value,
+                        ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
+                        ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                        ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                        ATTR_WEATHER_PRESSURE: forecast.pressure.value,
+                        ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                    }
+                ]
 
         return data
