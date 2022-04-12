@@ -194,7 +194,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     day = fc_time.day
                     data.append(
                         {
-                            ATTR_FORECAST_TIME: time.isoformat(),
+                            ATTR_FORECAST_TIME: time.isoformat(timespec="minutes"),
                             ATTR_FORECAST_CONDITION: get_weather_symbol(
                                 forecast.symbol.value
                             ),
@@ -215,7 +215,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         else:
             data = [
                 {
-                    ATTR_FORECAST_TIME: time.isoformat(),
+                    ATTR_FORECAST_TIME: time.isoformat(timespec="minutes"),
                     ATTR_FORECAST_CONDITION: get_weather_symbol(forecast.symbol.value),
                     ATTR_FORECAST_TEMP: forecast.temperature.value,
                     ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
