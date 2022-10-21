@@ -1,6 +1,6 @@
 {
   "domain": "fmi",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "name": "Finnish Meteorological Institute",
   "documentation": "https://www.home-assistant.io/integrations/fmi/",
   "requirements": [
