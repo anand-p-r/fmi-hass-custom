@@ -108,7 +108,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current is not None
 
     @property
-    def temperature(self):
+    def native_temperature(self):
         """Return the temperature."""
         if self._fmi is None:
             return None
@@ -116,7 +116,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current.data.temperature.value
 
     @property
-    def temperature_unit(self):
+    def native_temperature_unit(self):
         """Return the unit of measurement."""
         if self._fmi is None:
             return None
@@ -132,7 +132,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current.data.humidity.value
 
     @property
-    def precipitation(self):
+    def native_precipitation(self):
         """Return the humidity."""
         if self._fmi is None:
             return None
@@ -140,7 +140,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current.data.precipitation_amount.value
 
     @property
-    def wind_speed(self):
+    def native_wind_speed(self):
         """Return the wind speed."""
         if self._fmi is None:
             return None
@@ -158,7 +158,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current.data.wind_direction.value
 
     @property
-    def pressure(self):
+    def native_pressure(self):
         """Return the pressure."""
         if self._fmi is None:
             return None
