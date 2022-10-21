@@ -3,14 +3,14 @@ from dateutil import tz
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
-    ATTR_FORECAST_PRECIPITATION,
-    ATTR_FORECAST_TEMP,
+    ATTR_FORECAST_NATIVE_PRECIPITATION,
+    ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
-    ATTR_FORECAST_WIND_SPEED,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_WEATHER_HUMIDITY,
     ATTR_WEATHER_PRESSURE,
-    ATTR_FORECAST_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_TEMP_LOW,
     WeatherEntity,
 )
 
@@ -197,20 +197,20 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                             ATTR_FORECAST_CONDITION: get_weather_symbol(
                                 forecast.symbol.value
                             ),
-                            ATTR_FORECAST_TEMP: forecast.temperature.value,
-                            ATTR_FORECAST_TEMP_LOW: forecast.temperature.value,
-                            ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
-                            ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                            ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
+                            ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.temperature.value,
+                            ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
+                            ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
                             ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
                             ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                             ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
                         }
                     )
                 else:
-                    if data[-1][ATTR_FORECAST_TEMP] < forecast.temperature.value:
-                        data[-1][ATTR_FORECAST_TEMP] = forecast.temperature.value
-                    if data[-1][ATTR_FORECAST_TEMP_LOW] > forecast.temperature.value:
-                        data[-1][ATTR_FORECAST_TEMP_LOW] = forecast.temperature.value
+                    if data[-1][ATTR_FORECAST_NATIVE_TEMP] < forecast.temperature.value:
+                        data[-1][ATTR_FORECAST_NATIVE_TEMP] = forecast.temperature.value
+                    if data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] > forecast.temperature.value:
+                        data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] = forecast.temperature.value
         else:
             data = []
             for forecast in self._fmi.forecast.forecasts:
@@ -221,9 +221,9 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                         ATTR_FORECAST_CONDITION: get_weather_symbol(
                             forecast.symbol.value
                         ),
-                        ATTR_FORECAST_TEMP: forecast.temperature.value,
-                        ATTR_FORECAST_PRECIPITATION: forecast.precipitation_amount.value,
-                        ATTR_FORECAST_WIND_SPEED: forecast.wind_speed.value,
+                        ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
+                        ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
+                        ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
                         ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
                         ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                         ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
