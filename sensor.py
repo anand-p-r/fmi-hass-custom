@@ -14,6 +14,10 @@ from homeassistant.const import (
     PERCENTAGE
 )
 
+from homeassistant.components.sensor import (
+    SensorStateClass
+)
+
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -392,6 +396,11 @@ class FMIMareoSensor(CoordinatorEntity):
     def unit_of_measurement(self):
         """Return the unit of measurement of this entity, if any."""
         return self._unit_of_measurement
+
+    @property
+    def state_class(self):
+        """Return the state class."""
+        return SensorStateClass.MEASUREMENT
 
     @property
     def icon(self):
