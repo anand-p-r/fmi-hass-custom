@@ -166,6 +166,14 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         return self._fmi.current.data.pressure.value
 
     @property
+    def native_dew_point(self) -> float | None:
+        """Return the dew point."""
+        if self._fmi is None:
+            return None
+
+        return self._fmi.current.data.dew_point.value
+
+    @property
     def condition(self):
         """Return the condition."""
         if self._fmi is None:
