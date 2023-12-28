@@ -12,6 +12,8 @@ from homeassistant.components.weather import (
     ATTR_WEATHER_PRESSURE,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     WeatherEntity,
+    WeatherEntityFeature,
+    Forecast,
 )
 
 from awesomeversion import AwesomeVersion
@@ -44,6 +46,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
 class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     """Define an FMI Weather Entity."""
+
+    _attr_supported_features = (
+        WeatherEntityFeature.FORECAST_HOURLY |
+        WeatherEntityFeature.FORECAST_DAILY
+    )
 
     def __init__(self, name, coordinator, daily_mode):
         """Initialize FMI weather object."""
@@ -181,8 +188,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
 
         return get_weather_symbol(self._fmi.current.data.symbol.value, self._fmi.hass)
 
-    @property
-    def forecast(self):
+    def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
         if self._fmi is None:
             _LOGGER.debug("FMI: Coordinator is not available!")
@@ -191,7 +197,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         if self._fmi.forecast is None:
             return None
 
-        if self._daily_mode:
+        if daily_mode or self._daily_mode:
             # Daily mode, aggregate forecast for every day
             day = 0
             data = []
@@ -239,3 +245,20 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                 )
 
         return data
+
+    @property
+    def forecast(self) -> list[Forecast] | None:
+        """Return the forecast array. Legacy version!"""
+        return self._forecast()
+
+    async def async_forecast_hourly(self) -> list[Forecast] | None:
+        """Return the hourly forecast in native units."""
+        return self._forecast()
+
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        """Return the daily forecast in native units."""
+        return self._forecast(daily_mode=True)
+
+    async def async_update(self) -> None:
+        """Get the latest weather data."""
+        await self._fmi.async_refresh()
