@@ -9,16 +9,16 @@ from homeassistant.const import (
     ATTR_LOCATION,
     ATTR_TEMPERATURE,
     ATTR_TIME,
-    SPEED_METERS_PER_SECOND,
-    TEMP_CELSIUS,
-    PERCENTAGE
+    CONF_NAME,
+    PERCENTAGE,
+    UnitOfSpeed,
+    UnitOfTemperature,
 )
 
 from homeassistant.components.sensor import (
     SensorStateClass
 )
 
-from homeassistant.const import CONF_NAME
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -44,10 +44,10 @@ from .utils import (
 SENSOR_TYPES = {
     "place": ["Place", None],
     "weather": ["Condition", None],
-    "temperature": ["Temperature", TEMP_CELSIUS],
-    "wind_speed": ["Wind Speed", SPEED_METERS_PER_SECOND],
+    "temperature": ["Temperature", UnitOfTemperature.CELSIUS],
+    "wind_speed": ["Wind Speed", UnitOfSpeed.METERS_PER_SECOND],
     "wind_direction": ["Wind Direction", ""],
-    "wind_gust": ["Wind Gust", SPEED_METERS_PER_SECOND],
+    "wind_gust": ["Wind Gust", UnitOfSpeed.METERS_PER_SECOND],
     "humidity": ["Humidity", PERCENTAGE],
     "clouds": ["Cloud Coverage", PERCENTAGE],
     "rain": ["Rain", "mm/hr"],
@@ -277,7 +277,7 @@ class FMILightningStrikesSensor(CoordinatorEntity):
         self._unit_of_measurement = SENSOR_LIGHTNING_TYPES[sensor_type][1]
         self._fmi = coordinator
         self.lightning_data = coordinator.lightning_data
-        
+
         try:
             self._fmi_name = coordinator.current.place
         except:
