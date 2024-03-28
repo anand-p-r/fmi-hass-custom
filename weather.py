@@ -214,7 +214,9 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                             ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
-                            ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
+                            ATTR_FORECAST_NATIVE_WIND_SPEED: round(
+                            forecast.wind_speed.value * 3.6, 1
+                            ),  # Convert m/s to km/hr
                             ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
                             ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                             ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
