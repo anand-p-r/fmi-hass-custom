@@ -68,18 +68,17 @@ async def async_setup_entry(hass, config_entry) -> bool:
         UNDO_UPDATE_LISTENER: undo_listener,
     }
 
-    for component in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(config_entry, component)
-        )
+    await hass.config_entries.async_forward_entry_setups(
+        config_entry,
+        PLATFORMS
+    )
 
     return True
 
 
 async def async_unload_entry(hass, config_entry):
     """Unload an FMI config entry."""
-    for component in PLATFORMS:
-        await hass.config_entries.async_forward_entry_unload(config_entry, component)
+    await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
 
     hass.data[DOMAIN][config_entry.entry_id][UNDO_UPDATE_LISTENER]()
     hass.data[DOMAIN].pop(config_entry.entry_id)
