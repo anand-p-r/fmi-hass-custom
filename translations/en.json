@@ -32,7 +32,7 @@
                     "min_temperature": "Min Temperature °C",
                     "min_wind_speed": "Min Wind Speed m/s",
                     "offset": "Forecast Interval h",
-                    "daily_mode": "Add Daily mode entity",
+                    "daily_mode": "Add Daily forecast entity",
                     "lightning_sensor": "Lightning sensor"
                 },
                 "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",
