@@ -1,0 +1,43 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Antamasi sijainti on jo määritelty"
+        },
+        "error": {
+            "cannot_connect": "Yhteydenotto epäonnistui",
+            "unknown": "Odottamaton virhe"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "latitude": "Leveysaste",
+                    "longitude": "Pituusaste",
+                    "name": "Nimi"
+                },
+                "description": "Ilmatieteen laitos määrittely parametrit",
+                "title": "Ilmatieteen laitos"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "user": {
+                "data": {
+                    "max_precipitation": "Maksimi sateenkertymä mm",
+                    "max_relative_humidity": "Maksimi suhteellinen kosteus %",
+                    "max_temperature": "Maksimi lämpötila °C",
+                    "max_wind_speed": "Maksimi tuulennopeus m/s",
+                    "min_precipitation": "Minimi sateenkertymä mm",
+                    "min_relative_humidity": "Minimi suhteellinen kosteus %",
+                    "min_temperature": "Minimi lämpötila °C",
+                    "min_wind_speed": "Minimi tuulennopeus m/s",
+                    "offset": "Sääennusteen aikaväli h",
+                    "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
+                    "lightning_sensor": "Aktivoi ukkostutka"
+                },
+                "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",
+                "title": "Ilmatieteen laitos asetukset"
+            }
+        }
+    }
+}

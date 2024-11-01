@@ -1,7 +1,7 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Location is already configured"
+            "already_configured": "The given location is already configured"
         },
         "error": {
             "cannot_connect": "Failed to connect",
@@ -23,20 +23,20 @@
         "step": {
             "user": {
                 "data": {
-                    "max_precipitation": "Max Precipitation",
-                    "max_relative_humidity": "Max Relative Humidity",
-                    "max_temperature": "Max Temperature",
-                    "max_wind_speed": "Max Wind Speed",
-                    "min_precipitation": "Min Precipitation",
-                    "min_relative_humidity": "Min Relative Humidity",
-                    "min_temperature": "Min Temperature",
-                    "min_wind_speed": "Min Wind Speed",
-                    "offset": "Forecast Interval",
-                    "daily_mode": "Daily mode",
-                    "lightning_sensor": "Lightning sensor"
+                    "max_precipitation": "Max Precipitation mm",
+                    "max_relative_humidity": "Max Relative Humidity %",
+                    "max_temperature": "Max Temperature °C",
+                    "max_wind_speed": "Max Wind Speed m/s",
+                    "min_precipitation": "Min Precipitation mm",
+                    "min_relative_humidity": "Min Relative Humidity %",
+                    "min_temperature": "Min Temperature °C",
+                    "min_wind_speed": "Min Wind Speed m/s",
+                    "offset": "Forecast Interval h",
+                    "daily_mode": "Activate Daily forecast entity",
+                    "lightning_sensor": "Activate Lightning sensor"
                 },
-                "description": "FMI Configuration Parameters",
-                "title": "FMI Options"
+                "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",
+                "title": "Finnish Meteorological Institute Options"
             }
         }
     }
