@@ -13,7 +13,12 @@ from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
+try:
+    # HA 2024.11 and newer
+    from homeassistant.core_config import Config
+except ImportError:
+    # HA 2024.10 and older
+    from homeassistant.core import Config
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
