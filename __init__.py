@@ -12,7 +12,8 @@ from fmi_weather_client.errors import ClientError, ServerError
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
-from homeassistant.core import Config, HomeAssistant
+from homeassistant.core import HomeAssistant
+from homeassistant.core_config import Config
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
