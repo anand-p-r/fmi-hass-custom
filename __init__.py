@@ -13,12 +13,7 @@ from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import HomeAssistant
-try:
-    # HA 2024.11 and newer
-    from homeassistant.core_config import Config
-except ImportError:
-    # HA 2024.10 and older
-    from homeassistant.core import Config
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
@@ -49,7 +44,7 @@ def base_unique_id(latitude, longitude):
     return f"{latitude}_{longitude}"
 
 
-async def async_setup(hass: HomeAssistant, config: Config) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up configured FMI."""
     hass.data.setdefault(DOMAIN, {})
     return True
@@ -142,7 +137,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.max_precip = float(config_entry.options.get(CONF_MAX_PRECIPITATION, 0.2))
         self.daily_mode = bool(config_entry.options.get(CONF_DAILY_MODE, False))
         self.lightning_mode = bool(config_entry.options.get(CONF_LIGHTNING, False))
-        
+
         self.current = None
         self.forecast = None
         self._hass = hass
@@ -268,10 +263,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                             add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_indx)
                             loc_time_list.append(add_tuple)
                             num_locs += 1
-                            
+
                             if time.time() > loop_timeout:
                                 break
-                        
+
                 elif child.tag.find("doubleOrNilReasonTupleList") > 0:
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
