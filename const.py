@@ -18,6 +18,7 @@ COORDINATOR = "coordinator"
 MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=30)
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
+CONF_FORECAST_DAYS = "forecast_days"
 CONF_MIN_HUMIDITY = "min_relative_humidity"
 CONF_MAX_HUMIDITY = "max_relative_humidity"
 CONF_MIN_TEMP = "min_temperature"
@@ -32,6 +33,8 @@ CONF_LIGHTNING = "lightning_sensor"
 HUMIDITY_RANGE = list(range(1, 101))
 TEMP_RANGE = list(range(-40, 50))
 WIND_SPEED = list(range(0, 31))
+DAYS_RANGE = list(range(0, 11))  # 0 to 10 days, 0 = disable forecast
+DAYS_DEFAULT = 4  # default to 4 days
 
 FORECAST_OFFSET = [1, 2, 3, 4, 6, 8, 12, 24]  # Based on API test runs
 DEFAULT_NAME = "FMI"

@@ -1,33 +1,16 @@
 """Config flow for FMI (Finnish Meteorological Institute) integration."""
 
 import fmi_weather_client as fmi_client
-from fmi_weather_client.errors import ClientError, ServerError
+import fmi_weather_client.errors as fmi_erros
+
 import voluptuous as vol
 
 from homeassistant import config_entries, core
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, CONF_OFFSET
-from homeassistant.core import callback
+import homeassistant.const as ha_const
 from homeassistant.helpers import config_validation as cv
 
 from . import base_unique_id
-
-from .const import (
-    _LOGGER,
-    FORECAST_OFFSET,
-    CONF_MIN_HUMIDITY,
-    CONF_MAX_HUMIDITY,
-    CONF_MIN_TEMP,
-    CONF_MAX_TEMP,
-    CONF_MIN_WIND_SPEED,
-    CONF_MAX_WIND_SPEED,
-    CONF_MIN_PRECIPITATION,
-    CONF_MAX_PRECIPITATION,
-    CONF_DAILY_MODE,
-    HUMIDITY_RANGE,
-    TEMP_RANGE,
-    WIND_SPEED,
-    CONF_LIGHTNING,
-)
+from . import const
 
 
 async def validate_user_config(hass: core.HomeAssistant, data):
@@ -36,8 +19,8 @@ async def validate_user_config(hass: core.HomeAssistant, data):
     Data contains Latitude / Longitude provided by user or from
     HASS default configuration.
     """
-    latitude = data[CONF_LATITUDE]
-    longitude = data[CONF_LONGITUDE]
+    latitude = data[ha_const.CONF_LATITUDE]
+    longitude = data[ha_const.CONF_LONGITUDE]
 
     errors = ""
 
@@ -48,7 +31,7 @@ async def validate_user_config(hass: core.HomeAssistant, data):
         )
 
         return {"place": weather_data.place, "err": ""}
-    except ClientError as err:
+    except fmi_erros.ClientError as err:
         err_string = (
             "Client error with status "
             + str(err.status_code)
@@ -56,8 +39,8 @@ async def validate_user_config(hass: core.HomeAssistant, data):
             + err.message
         )
         errors = "client_connect_error"
-        _LOGGER.error(err_string)
-    except ServerError as err:
+        const._LOGGER.error(err_string)
+    except fmi_erros.ServerError as err:
         err_string = (
             "Server error with status "
             + str(err.status_code)
@@ -65,7 +48,7 @@ async def validate_user_config(hass: core.HomeAssistant, data):
             + err.body
         )
         errors = "server_connect_error"
-        _LOGGER.error(err_string)
+        const._LOGGER.error(err_string)
 
     return {"place": "None", "err": errors}
 
@@ -83,7 +66,8 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain="fmi"):
         if user_input is not None:
 
             await self.async_set_unique_id(
-                base_unique_id(user_input[CONF_LATITUDE], user_input[CONF_LONGITUDE])
+                base_unique_id(user_input[ha_const.CONF_LATITUDE],
+                               user_input[ha_const.CONF_LONGITUDE])
             )
             self._abort_if_unique_id_configured()
 
@@ -96,13 +80,11 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain="fmi"):
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_NAME, default="FMI"): str,
-                vol.Required(
-                    CONF_LATITUDE, default=self.hass.config.latitude
-                ): cv.latitude,
-                vol.Required(
-                    CONF_LONGITUDE, default=self.hass.config.longitude
-                ): cv.longitude
+                vol.Required(ha_const.CONF_NAME, default=const.DEFAULT_NAME): str,
+                vol.Required(ha_const.CONF_LATITUDE,
+                             default=self.hass.config.latitude): cv.latitude,
+                vol.Required(ha_const.CONF_LONGITUDE,
+                             default=self.hass.config.longitude): cv.longitude
             }
         )
 
@@ -113,18 +95,18 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain="fmi"):
         )
 
     @staticmethod
-    @callback
+    @core.callback
     def async_get_options_flow(config_entry):
         """Options callback for FMI."""
-        return FMIOptionsFlowHandler(config_entry)
+        return FMIOptionsFlowHandler()
 
 
 class FMIOptionsFlowHandler(config_entries.OptionsFlow):
     """Config flow options for FMI."""
 
-    def __init__(self, config_entry):
-        """Initialize FMI options flow."""
-        self.config_entry = config_entry
+    @property
+    def config_entry(self):
+        return self.hass.config_entries.async_get_entry(self.handler)
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
@@ -139,27 +121,30 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                vol.Optional(CONF_OFFSET, default=1): vol.In(FORECAST_OFFSET),
-                vol.Optional(CONF_MIN_HUMIDITY, default=self.config_entry.options.get(
-                    CONF_MIN_HUMIDITY, 30)): vol.In(HUMIDITY_RANGE),
-                vol.Optional(CONF_MAX_HUMIDITY, default=self.config_entry.options.get(
-                    CONF_MAX_HUMIDITY, 70)): vol.In(HUMIDITY_RANGE),
-                vol.Optional(CONF_MIN_TEMP, default=self.config_entry.options.get(
-                        CONF_MIN_TEMP, 10)): vol.In(TEMP_RANGE),
-                vol.Optional(CONF_MAX_TEMP, default=self.config_entry.options.get(
-                        CONF_MAX_TEMP, 30)): vol.In(TEMP_RANGE),
-                vol.Optional(CONF_MIN_WIND_SPEED, default=self.config_entry.options.get(
-                        CONF_MIN_WIND_SPEED, 0)): vol.In(WIND_SPEED),
-                vol.Optional(CONF_MAX_WIND_SPEED, default=self.config_entry.options.get(
-                        CONF_MAX_WIND_SPEED, 25)): vol.In(WIND_SPEED),
-                vol.Optional(CONF_MIN_PRECIPITATION, default=self.config_entry.options.get(
-                        CONF_MIN_PRECIPITATION, 0.0)): cv.small_float,
-                vol.Optional(CONF_MAX_PRECIPITATION, default=self.config_entry.options.get(
-                    CONF_MAX_PRECIPITATION, 0.2)): cv.small_float,
-                vol.Optional(CONF_DAILY_MODE, default=self.config_entry.options.get(
-                    CONF_DAILY_MODE, False)): cv.boolean,
-                vol.Optional(CONF_LIGHTNING, default=self.config_entry.options.get(
-                    CONF_LIGHTNING, False)): cv.boolean,
+                vol.Optional(const.CONF_FORECAST_DAYS, default=self.config_entry.options.get(
+                    const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)): vol.In(const.DAYS_RANGE),
+                vol.Optional(ha_const.CONF_OFFSET, default=self.config_entry.options.get(
+                    ha_const.CONF_OFFSET, const.FORECAST_OFFSET[0])): vol.In(const.FORECAST_OFFSET),
+                vol.Optional(const.CONF_MIN_HUMIDITY, default=self.config_entry.options.get(
+                    const.CONF_MIN_HUMIDITY, 30)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MAX_HUMIDITY, default=self.config_entry.options.get(
+                    const.CONF_MAX_HUMIDITY, 70)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MIN_TEMP, default=self.config_entry.options.get(
+                    const.CONF_MIN_TEMP, 10)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MAX_TEMP, default=self.config_entry.options.get(
+                    const.CONF_MAX_TEMP, 30)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MIN_WIND_SPEED, default=self.config_entry.options.get(
+                    const.CONF_MIN_WIND_SPEED, 0)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MAX_WIND_SPEED, default=self.config_entry.options.get(
+                    const.CONF_MAX_WIND_SPEED, 25)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MIN_PRECIPITATION, default=self.config_entry.options.get(
+                    const.CONF_MIN_PRECIPITATION, 0.0)): cv.small_float,
+                vol.Optional(const.CONF_MAX_PRECIPITATION, default=self.config_entry.options.get(
+                    const.CONF_MAX_PRECIPITATION, 0.2)): cv.small_float,
+                vol.Optional(const.CONF_DAILY_MODE, default=self.config_entry.options.get(
+                    const.CONF_DAILY_MODE, False)): cv.boolean,
+                vol.Optional(const.CONF_LIGHTNING, default=self.config_entry.options.get(
+                    const.CONF_LIGHTNING, False)): cv.boolean,
                 }
             )
         )

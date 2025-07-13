@@ -32,6 +32,7 @@
                     "min_temperature": "Minimi lämpötila °C",
                     "min_wind_speed": "Minimi tuulennopeus m/s",
                     "offset": "Sääennusteen aikaväli h",
+                    "forecast_days": "Ennustepäivien määrä",
                     "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
                     "lightning_sensor": "Aktivoi ukkostutka"
                 },
