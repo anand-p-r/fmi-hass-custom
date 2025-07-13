@@ -32,6 +32,7 @@
                     "min_temperature": "Min Temperature °C",
                     "min_wind_speed": "Min Wind Speed m/s",
                     "offset": "Forecast Interval h",
+                    "forecast_days": "Num of forecast days",
                     "daily_mode": "Activate Daily forecast entity",
                     "lightning_sensor": "Activate Lightning sensor"
                 },

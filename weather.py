@@ -15,27 +15,23 @@ from homeassistant.components.weather import (
     WeatherEntityFeature,
     Forecast,
 )
-
 from awesomeversion import AwesomeVersion
 from homeassistant.const import CONF_NAME, __version__ as HA_VERSION
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import CONF_DAILY_MODE
 
-from .utils import get_weather_symbol
+from . import const
+from . import utils
 
-from .const import _LOGGER, ATTRIBUTION, COORDINATOR, DOMAIN, MANUFACTURER, NAME
 
 PARALLEL_UPDATES = 1
-
-CURRENT_HA_VERSION = AwesomeVersion(HA_VERSION)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
     name = config_entry.data[CONF_NAME]
-    daily_mode = config_entry.options.get(CONF_DAILY_MODE, False)
+    daily_mode = config_entry.options.get(const.CONF_DAILY_MODE, False)
 
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
+    coordinator = hass.data[const.DOMAIN][config_entry.entry_id][const.COORDINATOR]
 
     entity_list = [FMIWeatherEntity(name, coordinator, False)]
     if daily_mode:
@@ -79,7 +75,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     @property
     def attribution(self):
         """Return the attribution."""
-        return ATTRIBUTION
+        return const.ATTRIBUTION
 
     @property
     def unique_id(self):
@@ -90,14 +86,15 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     def device_info(self):
         """Return the device info."""
         info = {
-            "identifiers": {(DOMAIN, self.coordinator.unique_id)},
-            "name": NAME,
-            "manufacturer": MANUFACTURER,
+            "identifiers": {(const.DOMAIN, self.coordinator.unique_id)},
+            "name": const.NAME,
+            "manufacturer": const.MANUFACTURER,
         }
 
         # Legacy fallback can be removed when minimum required
         # HA version is 2021.12.
-        if CURRENT_HA_VERSION >= "2021.12.0b0":
+        version = AwesomeVersion(HA_VERSION)
+        if version >= "2021.12.0b0":
             from homeassistant.helpers.device_registry import DeviceEntryType
 
             info["entry_type"] = DeviceEntryType.SERVICE
@@ -186,12 +183,12 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         if self._fmi is None:
             return None
 
-        return get_weather_symbol(self._fmi.current.data.symbol.value, self._fmi.hass)
+        return utils.get_weather_symbol(self._fmi.current.data.symbol.value, self._fmi.hass)
 
     def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
         if self._fmi is None:
-            _LOGGER.debug("FMI: Coordinator is not available!")
+            const._LOGGER.debug("FMI: Coordinator is not available!")
             return None
 
         if self._fmi.forecast is None:
@@ -208,9 +205,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     data.append(
                         {
                             ATTR_FORECAST_TIME: fc_time.isoformat(),
-                            ATTR_FORECAST_CONDITION: get_weather_symbol(
-                                forecast.symbol.value
-                            ),
+                            ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
                             ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
@@ -232,9 +227,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                 data.append(
                     {
                         ATTR_FORECAST_TIME: fc_time.isoformat(),
-                        ATTR_FORECAST_CONDITION: get_weather_symbol(
-                            forecast.symbol.value
-                        ),
+                        ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
                         ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
                         ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
                         ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
