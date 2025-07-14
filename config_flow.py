@@ -117,34 +117,38 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="FMI Options", data=user_input)
 
+        _options = self.config_entry.options
+
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                vol.Optional(const.CONF_FORECAST_DAYS, default=self.config_entry.options.get(
+                vol.Optional(const.CONF_FORECAST_DAYS, default=_options.get(
                     const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)): vol.In(const.DAYS_RANGE),
-                vol.Optional(ha_const.CONF_OFFSET, default=self.config_entry.options.get(
+                vol.Optional(ha_const.CONF_OFFSET, default=_options.get(
                     ha_const.CONF_OFFSET, const.FORECAST_OFFSET[0])): vol.In(const.FORECAST_OFFSET),
-                vol.Optional(const.CONF_MIN_HUMIDITY, default=self.config_entry.options.get(
-                    const.CONF_MIN_HUMIDITY, 30)): vol.In(const.HUMIDITY_RANGE),
-                vol.Optional(const.CONF_MAX_HUMIDITY, default=self.config_entry.options.get(
-                    const.CONF_MAX_HUMIDITY, 70)): vol.In(const.HUMIDITY_RANGE),
-                vol.Optional(const.CONF_MIN_TEMP, default=self.config_entry.options.get(
-                    const.CONF_MIN_TEMP, 10)): vol.In(const.TEMP_RANGE),
-                vol.Optional(const.CONF_MAX_TEMP, default=self.config_entry.options.get(
-                    const.CONF_MAX_TEMP, 30)): vol.In(const.TEMP_RANGE),
-                vol.Optional(const.CONF_MIN_WIND_SPEED, default=self.config_entry.options.get(
-                    const.CONF_MIN_WIND_SPEED, 0)): vol.In(const.WIND_SPEED),
-                vol.Optional(const.CONF_MAX_WIND_SPEED, default=self.config_entry.options.get(
-                    const.CONF_MAX_WIND_SPEED, 25)): vol.In(const.WIND_SPEED),
-                vol.Optional(const.CONF_MIN_PRECIPITATION, default=self.config_entry.options.get(
-                    const.CONF_MIN_PRECIPITATION, 0.0)): cv.small_float,
-                vol.Optional(const.CONF_MAX_PRECIPITATION, default=self.config_entry.options.get(
-                    const.CONF_MAX_PRECIPITATION, 0.2)): cv.small_float,
-                vol.Optional(const.CONF_DAILY_MODE, default=self.config_entry.options.get(
-                    const.CONF_DAILY_MODE, False)): cv.boolean,
-                vol.Optional(const.CONF_LIGHTNING, default=self.config_entry.options.get(
-                    const.CONF_LIGHTNING, False)): cv.boolean,
+                vol.Optional(const.CONF_MIN_HUMIDITY, default=_options.get(
+                    const.CONF_MIN_HUMIDITY, const.HUMIDITY_MIN_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MAX_HUMIDITY, default=_options.get(
+                    const.CONF_MAX_HUMIDITY, const.HUMIDITY_MAX_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MIN_TEMP, default=_options.get(
+                    const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MAX_TEMP, default=_options.get(
+                    const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MIN_WIND_SPEED, default=_options.get(
+                    const.CONF_MIN_WIND_SPEED, const.WIND_SPEED_MIN_DEFAULT)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MAX_WIND_SPEED, default=_options.get(
+                    const.CONF_MAX_WIND_SPEED, const.WIND_SPEED_MAX_DEFAULT)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MIN_PRECIPITATION, default=_options.get(
+                    const.CONF_MIN_PRECIPITATION, const.PRECIPITATION_MIN_DEFAULT)): cv.small_float,
+                vol.Optional(const.CONF_MAX_PRECIPITATION, default=_options.get(
+                    const.CONF_MAX_PRECIPITATION, const.PRECIPITATION_MAX_DEFAULT)): cv.small_float,
+                vol.Optional(const.CONF_DAILY_MODE, default=_options.get(
+                    const.CONF_DAILY_MODE, const.DAILY_MODE_DEFAULT)): cv.boolean,
+                vol.Optional(const.CONF_LIGHTNING, default=_options.get(
+                    const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT)): cv.boolean,
+                vol.Optional(const.CONF_LIGHTNING_DISTANCE, default=_options.get(
+                    const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM)): cv.positive_int,
                 }
             )
         )

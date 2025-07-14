@@ -120,16 +120,18 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.forecast_points = (
             int(_options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)
                 ) * 24 // self.time_step)
-        self.min_temperature = float(_options.get(const.CONF_MIN_TEMP, 10))
-        self.max_temperature = float(_options.get(const.CONF_MAX_TEMP, 30))
-        self.min_humidity = float(_options.get(const.CONF_MIN_HUMIDITY, 30))
-        self.max_humidity = float(_options.get(const.CONF_MAX_HUMIDITY, 70))
-        self.min_wind_speed = float(_options.get(const.CONF_MIN_WIND_SPEED, 0))
-        self.max_wind_speed = float(_options.get(const.CONF_MAX_WIND_SPEED, 25))
-        self.min_precip = float(_options.get(const.CONF_MIN_PRECIPITATION, 0.0))
-        self.max_precip = float(_options.get(const.CONF_MAX_PRECIPITATION, 0.2))
-        self.daily_mode = bool(_options.get(const.CONF_DAILY_MODE, False))
-        self.lightning_mode = bool(_options.get(const.CONF_LIGHTNING, False))
+        self.min_temperature = float(_options.get(const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT))
+        self.max_temperature = float(_options.get(const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT))
+        self.min_humidity = float(_options.get(const.CONF_MIN_HUMIDITY, const.HUMIDITY_MIN_DEFAULT))
+        self.max_humidity = float(_options.get(const.CONF_MAX_HUMIDITY, const.HUMIDITY_MAX_DEFAULT))
+        self.min_wind_speed = float(_options.get(const.CONF_MIN_WIND_SPEED, const.WIND_SPEED_MIN_DEFAULT))
+        self.max_wind_speed = float(_options.get(const.CONF_MAX_WIND_SPEED, const.WIND_SPEED_MAX_DEFAULT))
+        self.min_precip = float(_options.get(const.CONF_MIN_PRECIPITATION, const.PRECIPITATION_MIN_DEFAULT))
+        self.max_precip = float(_options.get(const.CONF_MAX_PRECIPITATION, const.PRECIPITATION_MAX_DEFAULT))
+        self.daily_mode = bool(_options.get(const.CONF_DAILY_MODE, const.DAILY_MODE_DEFAULT))
+        self.lightning_mode = bool(_options.get(const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT))
+        self.lightning_radius = int(_options.get(const.CONF_LIGHTNING_DISTANCE,
+                                                 const.BOUNDING_BOX_HALF_SIDE_KM))
 
         self.current = None
         self.forecast = None
@@ -228,7 +230,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             start_time_uri_param = f"starttime={str(start_time.date())}T{str(start_time.time())}Z&"
 
             ## Get Bounding Box coords
-            bbox_coords = utils.get_bounding_box(self.latitude, self.longitude, half_side_in_km=const.BOUNDING_BOX_HALF_SIDE_KM)
+            bbox_coords = utils.get_bounding_box(self.latitude, self.longitude, half_side_in_km=self.lightning_radius)
             bbox_uri_param = f"bbox={bbox_coords.lon_min},{bbox_coords.lat_min},{bbox_coords.lon_max},{bbox_coords.lat_max}&"
 
             base_url = const.BASE_URL + start_time_uri_param + bbox_uri_param
@@ -369,7 +371,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 LOGGER.debug("FMI: Best Conditions updated!")
 
                 # Update lightning strikes
-                if self.lightning_mode:
+                if self.lightning_mode and self.lightning_radius:
                     await self._hass.async_add_executor_job(
                         update_lightning_strikes
                     )

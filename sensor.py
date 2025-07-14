@@ -4,55 +4,24 @@ from datetime import datetime
 from dateutil import tz
 
 # Import homeassistant platform dependencies
-from homeassistant.const import (
-    ATTR_ATTRIBUTION,
-    ATTR_LOCATION,
-    ATTR_TEMPERATURE,
-    ATTR_TIME,
-    CONF_NAME,
-    PERCENTAGE,
-    UnitOfSpeed,
-    UnitOfTemperature,
-    UnitOfLength,
-    UnitOfVolumetricFlux,
-)
-
-from homeassistant.components.sensor import (
-    SensorStateClass
-)
-
+import homeassistant.const as ha_const
+from homeassistant.components.sensor import SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    CONF_LIGHTNING,
-    _LOGGER,
-    ATTRIBUTION,
-    DOMAIN,
-    ATTR_HUMIDITY,
-    ATTR_WIND_SPEED,
-    ATTR_PRECIPITATION,
-    ATTR_DISTANCE,
-    ATTR_STRIKES,
-    ATTR_PEAK_CURRENT,
-    ATTR_CLOUD_COVER,
-    ATTR_ELLIPSE_MAJOR,
-    COORDINATOR
-)
+from . import utils
+from . import const
 
-from .utils import (
-    get_weather_symbol
-)
 
 SENSOR_TYPES = {
     "place": ["Place", None, "mdi:city-variant"],
     "weather": ["Condition", None, None],
-    "temperature": ["Temperature", UnitOfTemperature.CELSIUS, "mdi:thermometer"],
-    "wind_speed": ["Wind Speed", UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
+    "temperature": ["Temperature", ha_const.UnitOfTemperature.CELSIUS, "mdi:thermometer"],
+    "wind_speed": ["Wind Speed", ha_const.UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
     "wind_direction": ["Wind Direction", "", "mdi:weather-windy"],
-    "wind_gust": ["Wind Gust", UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
-    "humidity": ["Humidity", PERCENTAGE, "mdi:water"],
-    "clouds": ["Cloud Coverage", PERCENTAGE, "mdi:weather-cloudy"],
-    "rain": ["Rain", UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR, "mdi:weather-pouring"],
+    "wind_gust": ["Wind Gust", ha_const.UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
+    "humidity": ["Humidity", ha_const.PERCENTAGE, "mdi:water"],
+    "clouds": ["Cloud Coverage", ha_const.PERCENTAGE, "mdi:weather-cloudy"],
+    "rain": ["Rain", ha_const.UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR, "mdi:weather-pouring"],
     "forecast_time": ["Time", None, "mdi:av-timer"],
     "time": ["Best Time Of Day", None, "mdi:av-timer"],
 }
@@ -62,7 +31,7 @@ SENSOR_LIGHTNING_TYPES = {
 }
 
 SENSOR_MAREO_TYPES = {
-    "sea_level": ["Sea Level", UnitOfLength.CENTIMETERS, "mdi:waves"]
+    "sea_level": ["Sea Level", ha_const.UnitOfLength.CENTIMETERS, "mdi:waves"]
 }
 
 PARALLEL_UPDATES = 1
@@ -70,10 +39,10 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the FMI Sensor, including Best Time Of the Day sensor."""
-    name = config_entry.data[CONF_NAME]
-    lightning_mode = config_entry.options.get(CONF_LIGHTNING, False)
+    name = config_entry.data[ha_const.CONF_NAME]
+    lightning_mode = config_entry.options.get(const.CONF_LIGHTNING, False)
 
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
+    coordinator = hass.data[const.DOMAIN][config_entry.entry_id][const.COORDINATOR]
 
     entity_list = []
 
@@ -170,16 +139,16 @@ class FMIBestConditionSensor(_BaseSensorClass):
             if _fmi is not None:
                 if _fmi.current is not None:
                     return {
-                        ATTR_LOCATION: _fmi.current.place,
-                        ATTR_TIME: _fmi.best_time,
-                        ATTR_TEMPERATURE: _fmi.best_temperature,
-                        ATTR_HUMIDITY: _fmi.best_humidity,
-                        ATTR_PRECIPITATION: _fmi.best_precipitation,
-                        ATTR_WIND_SPEED: _fmi.best_wind_speed,
-                        ATTR_ATTRIBUTION: ATTRIBUTION,
+                        ha_const.ATTR_LOCATION: _fmi.current.place,
+                        ha_const.ATTR_TIME: _fmi.best_time,
+                        ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
+                        const.ATTR_HUMIDITY: _fmi.best_humidity,
+                        const.ATTR_PRECIPITATION: _fmi.best_precipitation,
+                        const.ATTR_WIND_SPEED: _fmi.best_wind_speed,
+                        ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
                     }
 
-        return {ATTR_ATTRIBUTION: ATTRIBUTION}
+        return {ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION}
 
     @staticmethod
     def get_wind_direction_string(wind_direction_in_deg):
@@ -211,11 +180,11 @@ class FMIBestConditionSensor(_BaseSensorClass):
         _fmi = self._fmi
         _type = self.type
         if _fmi is None:
-            _LOGGER.debug("FMI: Coordinator is not available")
+            const._LOGGER.debug("FMI: Coordinator is not available")
             return
 
         if _fmi.current is None:
-            _LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
+            const._LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
 
         if _type == "place":
@@ -232,7 +201,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
             # Forecasted weather based on configured time_step - next forecasted hour, if available
 
             if _fmi.forecast is None:
-                _LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
+                const._LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
             # If current time is half past or more then use the hour next to next hour
@@ -245,14 +214,14 @@ class FMIBestConditionSensor(_BaseSensorClass):
                 source_data = _fmi.forecast.forecasts[0]
 
         if source_data is None:
-            _LOGGER.debug("FMI: Sensor Source data is unavailable")
+            const._LOGGER.debug("FMI: Sensor Source data is unavailable")
             return
 
         _state = None
         if _type == "forecast_time":
             _state = source_data.time.astimezone(tz.tzlocal())
         elif _type == "weather":
-            _state = get_weather_symbol(source_data.symbol.value)
+            _state = utils.get_weather_symbol(source_data.symbol.value)
         elif _type == "temperature":
             _state = source_data.temperature.value
         elif _type == "wind_speed":
@@ -294,26 +263,26 @@ class FMILightningStrikesSensor(_BaseSensorClass):
             return []
 
         return {
-            ATTR_LOCATION: _data[0].location,
-            ATTR_TIME: _data[0].time,
-            ATTR_DISTANCE: _data[0].distance,
-            ATTR_STRIKES: _data[0].strikes,
-            ATTR_PEAK_CURRENT: _data[0].peak_current,
-            ATTR_CLOUD_COVER: _data[0].cloud_cover,
-            ATTR_ELLIPSE_MAJOR: _data[0].ellipse_major,
+            ha_const.ATTR_LOCATION: _data[0].location,
+            ha_const.ATTR_TIME: _data[0].time,
+            const.ATTR_DISTANCE: _data[0].distance,
+            const.ATTR_STRIKES: _data[0].strikes,
+            const.ATTR_PEAK_CURRENT: _data[0].peak_current,
+            const.ATTR_CLOUD_COVER: _data[0].cloud_cover,
+            const.ATTR_ELLIPSE_MAJOR: _data[0].ellipse_major,
             "OBSERVATIONS": [
                 {
-                    ATTR_LOCATION: strike.location,
-                    ATTR_TIME: strike.time,
-                    ATTR_DISTANCE: strike.distance,
-                    ATTR_STRIKES: strike.strikes,
-                    ATTR_PEAK_CURRENT: strike.peak_current,
-                    ATTR_CLOUD_COVER: strike.cloud_cover,
-                    ATTR_ELLIPSE_MAJOR: strike.ellipse_major,
+                    ha_const.ATTR_LOCATION: strike.location,
+                    ha_const.ATTR_TIME: strike.time,
+                    const.ATTR_DISTANCE: strike.distance,
+                    const.ATTR_STRIKES: strike.strikes,
+                    const.ATTR_PEAK_CURRENT: strike.peak_current,
+                    const.ATTR_CLOUD_COVER: strike.cloud_cover,
+                    const.ATTR_ELLIPSE_MAJOR: strike.ellipse_major,
                 }
                 for strike in _data[1:]
             ],
-            ATTR_ATTRIBUTION: ATTRIBUTION,
+            ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }
 
     def update(self):
@@ -322,7 +291,7 @@ class FMILightningStrikesSensor(_BaseSensorClass):
         try:
             self._state = self.lightning_data[0].location
         except:
-            _LOGGER.debug("FMI: Sensor Lightning is unavailable")
+            const._LOGGER.debug("FMI: Sensor Lightning is unavailable")
             self._state = "Unavailable"
 
 
@@ -342,19 +311,19 @@ class FMIMareoSensor(_BaseSensorClass):
             pass
         elif len(mareo_data) > 0:
             return {
-                ATTR_TIME: mareo_data[0][0],
+                ha_const.ATTR_TIME: mareo_data[0][0],
                 "FORECASTS": [],
-                ATTR_ATTRIBUTION: ATTRIBUTION
+                ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION
             }
         else:
             return []
 
         return {
-            ATTR_TIME: mareo_data[0][0],
+            ha_const.ATTR_TIME: mareo_data[0][0],
             "FORECASTS": [
                 {"time": item[0], "height": item[1]} for item in mareo_data[1:]
             ],
-            ATTR_ATTRIBUTION: ATTRIBUTION,
+            ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }
 
     def update(self):
@@ -365,5 +334,5 @@ class FMIMareoSensor(_BaseSensorClass):
         try:
             self._state = mareo_data[0][1]
         except:
-            _LOGGER.debug("FMI: Sensor Mareo is unavailable")
+            const._LOGGER.debug("FMI: Sensor Mareo is unavailable")
             self._state = "Unavailable"

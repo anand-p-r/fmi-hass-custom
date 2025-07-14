@@ -34,7 +34,8 @@
                     "offset": "Forecast Interval h",
                     "forecast_days": "Num of forecast days",
                     "daily_mode": "Activate Daily forecast entity",
-                    "lightning_sensor": "Activate Lightning sensor"
+                    "lightning_sensor": "Activate Lightning sensor",
+                    "lightning_radius": "Lightning sensor radius km"
                 },
                 "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",
                 "title": "Finnish Meteorological Institute Options"
