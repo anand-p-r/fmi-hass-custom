@@ -35,7 +35,8 @@
                     "forecast_days": "Ennustepäivien määrä",
                     "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
                     "lightning_sensor": "Aktivoi ukkostutka",
-                    "lightning_radius": "Ukkostutkan säde km"
+                    "lightning_radius": "Ukkostutkan säde km",
+                    "observation_enabled": "Ota havainnot käyttöön"
                 },
                 "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",
                 "title": "Ilmatieteen laitos asetukset"
