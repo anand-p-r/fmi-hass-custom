@@ -149,6 +149,8 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
                     const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT)): cv.boolean,
                 vol.Optional(const.CONF_LIGHTNING_DISTANCE, default=_options.get(
                     const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM)): cv.positive_int,
+                vol.Optional(const.CONF_OBSERVATION_EN, default=_options.get(
+                    const.CONF_OBSERVATION_EN, const.OBSERVATION_DEFAULT)): cv.boolean,
                 }
             )
         )

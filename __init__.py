@@ -132,6 +132,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         self.lightning_mode = bool(_options.get(const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT))
         self.lightning_radius = int(_options.get(const.CONF_LIGHTNING_DISTANCE,
                                                  const.BOUNDING_BOX_HALF_SIDE_KM))
+        self.observation_enabled = bool(_options.get(const.CONF_OBSERVATION_EN, const.OBSERVATION_DEFAULT))
 
         self.current = None
         self.forecast = None
@@ -358,8 +359,19 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
-                self.current = await fmi.async_weather_by_coordinates(
-                    self.latitude, self.longitude)
+                # Fetch current weather data
+                weather_data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
+
+                if self.observation_enabled and weather_data and weather_data.place is not None \
+                    and hasattr(fmi, 'async_observation_by_place'):
+                    # Fetch observation data from closest station
+                    LOGGER.debug(f"FMI: Fetching observation data for a place {weather_data.place}")
+                    observation_data = await fmi.async_observation_by_place(weather_data.place)
+                    if observation_data is not None:
+                        weather_data = observation_data
+
+                self.current = weather_data
+
                 if self.forecast_points:
                     self.forecast = await fmi.async_forecast_by_coordinates(
                         self.latitude, self.longitude, self.time_step, self.forecast_points)
