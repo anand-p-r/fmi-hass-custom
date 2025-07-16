@@ -15,8 +15,8 @@ from homeassistant.components.weather import (
     WeatherEntityFeature,
     Forecast,
 )
-from awesomeversion import AwesomeVersion
-from homeassistant.const import CONF_NAME, __version__ as HA_VERSION
+from homeassistant.const import CONF_NAME
+from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import const
@@ -64,7 +64,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     @property
     def name(self):
-        """Return the name of the place based on Lat/Long."""
+        """Return the name of the place based on Lat / Long."""
         if self._fmi is None or self._fmi.current is None:
             return self._name
 
@@ -91,15 +91,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             "manufacturer": const.MANUFACTURER,
         }
 
-        # Legacy fallback can be removed when minimum required
-        # HA version is 2021.12.
-        version = AwesomeVersion(HA_VERSION)
-        if version >= "2021.12.0b0":
-            from homeassistant.helpers.device_registry import DeviceEntryType
-
-            info["entry_type"] = DeviceEntryType.SERVICE
-        else:
-            info["entry_type"] = "service"
+        info["entry_type"] = DeviceEntryType.SERVICE
 
         return info
 
@@ -137,7 +129,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     @property
     def native_precipitation(self):
-        """Return the humidity."""
+        """Return the precipitation."""
         if self._fmi is None:
             return None
 
@@ -151,7 +143,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
 
         return round(
             self._fmi.current.data.wind_speed.value * 3.6, 1
-        )  # Convert m/s to km/hr
+        )  # Convert m/s to km/h
 
     @property
     def wind_bearing(self):
@@ -188,7 +180,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
         if self._fmi is None:
-            const._LOGGER.debug("FMI: Coordinator is not available!")
+            const._LOGGER.debug("FMI: Coordinator is not available")
             return None
 
         if self._fmi.forecast is None:

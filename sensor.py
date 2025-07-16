@@ -67,7 +67,7 @@ class _BaseSensorClass(CoordinatorEntity):
     """Common base class for all the sensor types"""
 
     def __init__(self, name, coordinator, sensor_type, sensor_data):
-        """Initialize the sensora base data."""
+        """Initialize the sensor base data."""
         super().__init__(coordinator)
         self.client_name = name
         self._name, self._unit_of_measurement, self._icon = sensor_data
@@ -78,14 +78,14 @@ class _BaseSensorClass(CoordinatorEntity):
             f"{coordinator.unique_id}_{name.replace(' ', '_')}_{self._name.replace(' ', '_')}"
         try:
             self._fmi_name = coordinator.current.place
-        except:
+        except Exception:
             self._fmi_name = None
 
         self.update()
 
     def update(self):
         raise NotImplementedError(
-            "Required update method is not implemented!")
+            "Required update method is not implemented")
 
     # This has not been working correctly so comment it out for now
     # @property
@@ -136,23 +136,22 @@ class FMIBestConditionSensor(_BaseSensorClass):
         """Return the state attributes."""
         if self.type == "time":
             _fmi = self._fmi
-            if _fmi is not None:
-                if _fmi.current is not None:
-                    return {
-                        ha_const.ATTR_LOCATION: _fmi.current.place,
-                        ha_const.ATTR_TIME: _fmi.best_time,
-                        ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
-                        const.ATTR_HUMIDITY: _fmi.best_humidity,
-                        const.ATTR_PRECIPITATION: _fmi.best_precipitation,
-                        const.ATTR_WIND_SPEED: _fmi.best_wind_speed,
-                        ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
-                    }
+            if _fmi is not None and _fmi.current is not None:
+                return {
+                    ha_const.ATTR_LOCATION: _fmi.current.place,
+                    ha_const.ATTR_TIME: _fmi.best_time,
+                    ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
+                    const.ATTR_HUMIDITY: _fmi.best_humidity,
+                    const.ATTR_PRECIPITATION: _fmi.best_precipitation,
+                    const.ATTR_WIND_SPEED: _fmi.best_wind_speed,
+                    ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
+                }
 
         return {ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION}
 
     @staticmethod
     def get_wind_direction_string(wind_direction_in_deg):
-        """Get the string interpretation of wind direction in degrees"""
+        """Get the string interpretation of wind direction in degrees."""
 
         if wind_direction_in_deg is not None:
             if wind_direction_in_deg <=23:
@@ -286,11 +285,11 @@ class FMILightningStrikesSensor(_BaseSensorClass):
         }
 
     def update(self):
-        """Get the latest data from FMI and updates the states."""
+        """Get the latest data from FMI and update the states."""
 
         try:
             self._state = self.lightning_data[0].location
-        except:
+        except Exception:
             const._LOGGER.debug("FMI: Sensor Lightning is unavailable")
             self._state = "Unavailable"
 
@@ -327,12 +326,12 @@ class FMIMareoSensor(_BaseSensorClass):
         }
 
     def update(self):
-        """Get the latest data from FMI and updates the states."""
+        """Get the latest data from FMI and update the states."""
 
         mareo_data = self._fmi.mareo_data.sea_levels
 
         try:
             self._state = mareo_data[0][1]
-        except:
+        except Exception:
             const._LOGGER.debug("FMI: Sensor Mareo is unavailable")
             self._state = "Unavailable"
