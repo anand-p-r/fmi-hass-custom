@@ -219,7 +219,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         def update_lightning_strikes():
             """Get the latest data from FMI and update the states."""
 
-            LOGGER.debug(f"FMI: Lightning started")
+            LOGGER.debug("FMI: Lightning started")
             loc_time_list = []
             home_cords = (self.latitude, self.longitude)
 
@@ -246,17 +246,17 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
                     num_locs = 0
-                    for loc_indx, val in enumerate(val_list):
+                    for loc_index, val in enumerate(val_list):
                         if val != "":
                             val_split = val.split(" ")
                             lightning_coords = (float(val_split[0]), float(val_split[1]))
                             distance = 0
                             try:
                                 distance = geodesic(lightning_coords, home_cords).km
-                            except:
+                            except Exception:
                                 LOGGER.info(f"Unable to find distance between {lightning_coords} and {home_cords}")
 
-                            add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_indx)
+                            add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_index)
                             loc_time_list.append(add_tuple)
                             num_locs += 1
 
@@ -266,19 +266,19 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 elif child.tag.find("doubleOrNilReasonTupleList") > 0:
                     clean_text = child.text.lstrip()
                     val_list = clean_text.split("\n")
-                    for indx, val in enumerate(val_list):
+                    for index, val in enumerate(val_list):
                         if val != "":
                             val_split = val.split(" ")
-                            exist_tuple = loc_time_list[indx]
-                            if indx == exist_tuple[4]:
+                            exist_tuple = loc_time_list[index]
+                            if index == exist_tuple[4]:
                                 add_tuple = (exist_tuple[0], exist_tuple[1], exist_tuple[2], exist_tuple[3], val_split[0], val_split[1], val_split[2], val_split[3])
-                                loc_time_list[indx] = add_tuple
+                                loc_time_list[index] = add_tuple
 
                                 if time.time() > loop_timeout:
                                     break
 
                             else:
-                                print("Record mismtach - aborting query!")
+                                print("Record mismatch - aborting query")
                                 break
 
             ## First sort for closes entries and filter to limit
@@ -293,9 +293,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             geolocator = Nominatim(user_agent="fmi_hassio_sensor")
 
             ## Reverse geocoding
-            loop_start_time = datetime.now()
             op_tuples = []
-            for indx, v in enumerate(loc_time_list):
+            for _, v in enumerate(loc_time_list):
                 loc = str(v[0]) + ", " + str(v[1])
                 loc_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(v[2])))
                 try:
@@ -307,15 +306,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 ## Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
                 op = FMILightningStruct(time_val=loc_time, location=location, distance=v[3], strikes=v[4], peak_current=v[5], cloud_cover=v[6], ellipse_major=v[7])
                 op_tuples.append(op)
-            loop_end_time = datetime.now()
             self.lightning_data = op_tuples
-            LOGGER.debug(f"FMI: Lightning ended")
+            LOGGER.debug("FMI: Lightning ended")
 
         # Update mareo data
         def update_mareo_data():
             """Get the latest mareograph forecast data from FMI and update the states."""
 
-            LOGGER.debug(f"FMI: mareo started")
+            LOGGER.debug("FMI: mareo started")
             ## Format datetime to string accepted as path parameter in REST
             start_time = datetime.today()
             start_time = str(start_time).split(".")[0]
@@ -344,7 +342,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     else:
                         LOGGER.debug("Sealevel forecast unsupported record: %s", root_mareo[n][0][2].text)
                         continue
-                except:
+                except Exception:
                     LOGGER.debug(f"Sealevel forecast records not in expected format for index - {n} of locstring - {loc_string}")
 
             mareo_op = FMIMareoStruct(sea_levels=sealevel_tuple_list)
@@ -352,9 +350,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             if len(sealevel_tuple_list) > 12:
                 LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
             else:
-                LOGGER.debug("FMI: Mareo_data not updated. No data available!")
+                LOGGER.debug("FMI: Mareo_data not updated. No data available")
 
-            LOGGER.debug(f"FMI: mareo ended")
+            LOGGER.debug("FMI: mareo ended")
             return
 
         try:
@@ -380,20 +378,20 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._hass.async_add_executor_job(
                     update_best_weather_condition
                 )
-                LOGGER.debug("FMI: Best Conditions updated!")
+                LOGGER.debug("FMI: Best Conditions updated")
 
                 # Update lightning strikes
                 if self.lightning_mode and self.lightning_radius:
                     await self._hass.async_add_executor_job(
                         update_lightning_strikes
                     )
-                    LOGGER.debug("FMI: Lightning Conditions updated!")
+                    LOGGER.debug("FMI: Lightning Conditions updated")
 
                 # Update mareograph data on sea level
                 await self._hass.async_add_executor_job(
                     update_mareo_data
                 )
-                LOGGER.debug("FMI: Mareograph sea level data updated!")
+                LOGGER.debug("FMI: Mareograph sea level data updated")
 
         except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
             raise UpdateFailed(error) from error

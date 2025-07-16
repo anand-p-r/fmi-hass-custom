@@ -5,7 +5,6 @@ import logging
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
-import time
 import requests
 import xml.etree.ElementTree as ET
 
@@ -59,7 +58,7 @@ def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km)
 def update_lightning_strikes(latitude=None, longitude=None, url=BASE_URL, custom_url=None):
     """Get the latest data from FMI and update the states."""
 
-    _LOGGER.debug(f"FMI: Lightning started")
+    _LOGGER.debug("FMI: Lightning started")
     loc_time_list = []
     home_cords = (latitude, longitude)
 
@@ -80,7 +79,7 @@ def update_lightning_strikes(latitude=None, longitude=None, url=BASE_URL, custom
         _LOGGER.debug(f"FMI: Lightning URI - {base_url}")
     else:
         base_url = custom_url
-        _LOGGER.debug(f"FMI: Lightning URI - Using custom url - {base_url}")
+        _LOGGER.debug(f"FMI: Lightning URI - Using custom URL - {base_url}")
 
 
     ## Fetch data
@@ -96,31 +95,31 @@ def update_lightning_strikes(latitude=None, longitude=None, url=BASE_URL, custom
             clean_text = child.text.lstrip()
             val_list = clean_text.split("\n")
             num_locs = 0
-            for loc_indx, val in enumerate(val_list):
+            for loc_index, val in enumerate(val_list):
                 if val != "":
                     val_split = val.split(" ")
                     lightning_coords = (float(val_split[0]), float(val_split[1]))
                     distance = 0
                     try:
                         distance = geodesic(lightning_coords, home_cords).km
-                    except:
+                    except Exception:
                         _LOGGER.info(f"Unable to find distance between {lightning_coords} and {home_cords}")
 
-                    add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_indx)
+                    add_tuple = (val_split[0], val_split[1], val_split[2], distance, loc_index)
                     loc_time_list.append(add_tuple)
                     num_locs += 1
         elif child.tag.find("doubleOrNilReasonTupleList") > 0:
             clean_text = child.text.lstrip()
             val_list = clean_text.split("\n")
-            for indx, val in enumerate(val_list):
+            for index, val in enumerate(val_list):
                 if val != "":
                     val_split = val.split(" ")
-                    exist_tuple = loc_time_list[indx]
-                    if indx == exist_tuple[4]:
+                    exist_tuple = loc_time_list[index]
+                    if index == exist_tuple[4]:
                         add_tuple = (exist_tuple[0], exist_tuple[1], exist_tuple[2], exist_tuple[3], val_split[0], val_split[1], val_split[2], val_split[3])
-                        loc_time_list[indx] = add_tuple
+                        loc_time_list[index] = add_tuple
                     else:
-                        print("Record mismtach - aborting query!")
+                        print("Record mismatch - aborting query")
                         break
 
     ## First sort for closes entries and filter to limit
@@ -139,17 +138,14 @@ def update_lightning_strikes(latitude=None, longitude=None, url=BASE_URL, custom
     geolocator = Nominatim(user_agent="fmi_hassio_sensor")
     
     ## Reverse geocoding
-    op_tuples = []
-    for indx, v in enumerate(loc_time_list):
+    for _, v in enumerate(loc_time_list):
         loc = str(v[0]) + ", " + str(v[1])
-        loc_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(v[2])))
         try:
-            location = geolocator.reverse(loc, language="en").address
+            geolocator.reverse(loc, language="en").address
         except Exception as e:
             _LOGGER.info(f"Unable to reverse geocode for address-{loc}. Got error-{e}")
-            location = loc
 
-    _LOGGER.debug(f"FMI: Lightning ended")
+    _LOGGER.debug("FMI: Lightning ended")
     return
 
 
