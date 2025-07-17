@@ -1,10 +1,12 @@
 """The FMI (Finnish Meteorological Institute) component."""
 
+import typing
 import time
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta
 
 import fmi_weather_client as fmi
+import fmi_weather_client.models as fmi_models
 import fmi_weather_client.errors as fmi_erros
 import requests
 from async_timeout import timeout
@@ -82,7 +84,8 @@ async def update_listener(hass, config_entry):
 
 class FMILightningStruct():
 
-    def __init__(self, time_val=None, location=None, distance=None, strikes=None, peak_current=None, cloud_cover=None, ellipse_major=None):
+    def __init__(self, time_val=None, location=None, distance=None, strikes=None,
+                 peak_current=None, cloud_cover=None, ellipse_major=None):
         """Initialize the lightning parameters."""
         self.time = time_val
         self.location = location
@@ -95,28 +98,52 @@ class FMILightningStruct():
 
 class FMIMareoStruct():
 
-    #def __init__(self, time_val=None, sea_level_now=None, sea_level_6hrs=None):
-    def __init__(self, sea_levels=None):
+    class SeaLevelData():
+        def __init__(self, time_val: datetime, sea_level: float):
+            """Initialize the sea level data."""
+            self.time = time_val
+            self.sea_level = sea_level
+
+    def __init__(self):
         """Initialize the sea height data."""
-        self.sea_levels = sea_levels
+        self.sea_levels: list[FMIMareoStruct.SeaLevelData] = []
+
+    def size(self) -> int:
+        """Get the size of the sea level data."""
+        return len(self.sea_levels)
+
+    def get_values(self) -> list[SeaLevelData]:
+        """Get the sea level values."""
+        return list(self.sea_levels)
+
+    def append(self, sea_level_data: SeaLevelData):
+        """Clear the sea level data."""
+        self.sea_levels.append(sea_level_data)
+
+    def append_values(self, time_val, sea_level):
+        """Clear the sea level data."""
+        sea_level_data = FMIMareoStruct.SeaLevelData(time_val, sea_level)
+        self.sea_levels.append(sea_level_data)
 
 
 class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching FMI data API."""
 
-    def __init__(self, hass, session, config_entry):
+    def __init__(self, hass: HomeAssistant, session, config_entry):
         """Initialize."""
 
         LOGGER.debug("Using lat: %s and long: %s",
             config_entry.data[CONF_LATITUDE], config_entry.data[CONF_LONGITUDE])
 
+        self._hass = hass
+
         self.latitude = config_entry.data[CONF_LATITUDE]
         self.longitude = config_entry.data[CONF_LONGITUDE]
         self.unique_id = str(self.latitude) + ":" + str(self.longitude)
 
-        _options = config_entry.options
+        _options: dict = config_entry.options
 
-        self.time_step = _options.get(CONF_OFFSET, const.FORECAST_OFFSET[0])
+        self.time_step = int(_options.get(CONF_OFFSET, const.FORECAST_OFFSET[0]))
         self.forecast_points = (
             int(_options.get(const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)
                 ) * 24 // self.time_step)
@@ -134,29 +161,39 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                                                  const.BOUNDING_BOX_HALF_SIDE_KM))
         self.observation_enabled = bool(_options.get(const.CONF_OBSERVATION_EN, const.OBSERVATION_DEFAULT))
 
-        self.current = None
-        self.forecast = None
-        self._hass = hass
+        self.current: typing.Optional[fmi_models.Weather] = None
+        self.forecast: typing.Optional[fmi_models.Forecast] = None
 
         # Best Time Attributes derived based on forecast weather data
-        self.best_time = None
-        self.best_temperature = None
-        self.best_humidity = None
-        self.best_wind_speed = None
-        self.best_precipitation = None
-        self.best_state = None
+        self.best_time: typing.Optional[datetime] = None
+        self.best_temperature: typing.Optional[float] = None
+        self.best_humidity: typing.Optional[float] = None
+        self.best_wind_speed: typing.Optional[float] = None
+        self.best_precipitation: typing.Optional[float] = None
+        self.best_state: typing.Optional[str] = None
 
         # Lightning strikes
-        self.lightning_data = None
+        self.lightning_data: typing.Optional[list[FMILightningStruct]] = None
 
         # Mareo
-        self.mareo_data = None
+        self.mareo_data: typing.Optional[FMIMareoStruct] = None
 
         min_update_time = const.MIN_TIME_BETWEEN_UPDATES
 
         LOGGER.debug("FMI: Data will be updated every %s min", min_update_time)
 
-        super().__init__(hass, LOGGER, name=const.DOMAIN, update_interval=min_update_time)
+        super().__init__(hass, LOGGER, config_entry=config_entry,
+                         name=const.DOMAIN, update_interval=min_update_time)
+
+    def get_current(self):
+        """Return the current weather data."""
+        return self.current
+
+    def get_current_place(self):
+        """Return the current place."""
+        if self.current is not None and hasattr(self.current, 'place'):
+            return self.current.place
+        return None
 
     async def _async_update_data(self):
         """Update data via Open API."""
@@ -294,7 +331,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             ## Reverse geocoding
             op_tuples = []
-            for _, v in enumerate(loc_time_list):
+            for v in loc_time_list:
                 loc = str(v[0]) + ", " + str(v[1])
                 loc_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(v[2])))
                 try:
@@ -304,7 +341,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                     location = loc
 
                 ## Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
-                op = FMILightningStruct(time_val=loc_time, location=location, distance=v[3], strikes=v[4], peak_current=v[5], cloud_cover=v[6], ellipse_major=v[7])
+                op = FMILightningStruct(time_val=loc_time, location=location, distance=v[3],
+                                        strikes=v[4], peak_current=v[5], cloud_cover=v[6], ellipse_major=v[7])
                 op_tuples.append(op)
             self.lightning_data = op_tuples
             LOGGER.debug("FMI: Lightning ended")
@@ -324,19 +362,19 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             loc_string = "latlon=" + str(self.latitude) + "," + str(self.longitude)
 
             base_mareo_url = const.BASE_MAREO_FORC_URL + loc_string + "&" + start_time + "&"
-            LOGGER.debug("FMI: Using Mareo url: %s", base_mareo_url)
+            LOGGER.debug("FMI: Using Mareo URL: %s", base_mareo_url)
 
             ## Fetch data
             response_mareo = requests.get(base_mareo_url, timeout=const.TIMEOUT_MAREO_PULL_IN_SECS)
 
             root_mareo = ET.fromstring(response_mareo.content)
 
-            sealevel_tuple_list = []
+            self.mareo_data = mareo_data = FMIMareoStruct()
+
             for n in range(len(root_mareo)):
                 try:
                     if root_mareo[n][0][2].text == 'SeaLevel':
-                        tuple_to_add = (root_mareo[n][0][1].text, root_mareo[n][0][3].text)
-                        sealevel_tuple_list.append(tuple_to_add)
+                        mareo_data.append_values(root_mareo[n][0][1].text, root_mareo[n][0][3].text)
                     elif root_mareo[n][0][2].text == 'SeaLevelN2000':
                         continue
                     else:
@@ -345,16 +383,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 except Exception:
                     LOGGER.debug(f"Sealevel forecast records not in expected format for index - {n} of locstring - {loc_string}")
 
-            mareo_op = FMIMareoStruct(sea_levels=sealevel_tuple_list)
-            self.mareo_data = mareo_op
-            if len(sealevel_tuple_list) > 12:
-                LOGGER.debug("FMI: Mareo_data updated with data: %s %s", sealevel_tuple_list[0], sealevel_tuple_list[12])
+            if mareo_data.size():
+                LOGGER.debug("FMI: Mareo data updated")
             else:
-                LOGGER.debug("FMI: Mareo_data not updated. No data available")
-
-            LOGGER.debug("FMI: mareo ended")
+                LOGGER.debug("FMI: Mareo data not updated. No data available")
             return
 
+        # do actual data fetching
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
                 # Fetch current weather data

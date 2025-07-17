@@ -8,6 +8,7 @@ import homeassistant.const as ha_const
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import FMIDataUpdateCoordinator
 from . import utils
 from . import const
 
@@ -66,43 +67,28 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class _BaseSensorClass(CoordinatorEntity):
     """Common base class for all the sensor types"""
 
-    def __init__(self, name, coordinator, sensor_type, sensor_data):
+    def __init__(self, name, coordinator, sensor_type, sensor_data, only_name=None):
         """Initialize the sensor base data."""
         super().__init__(coordinator)
         self.client_name = name
-        self._name, self._unit_of_measurement, self._icon = sensor_data
-        self._fmi = coordinator
-        self._state = None
+        self._name, self._attr_unit_of_measurement, self._attr_icon = sensor_data
+        self._state = ha_const.STATE_UNAVAILABLE
         self.type = sensor_type
-        self._unique_id = \
+        self._attr_unique_id = \
             f"{coordinator.unique_id}_{name.replace(' ', '_')}_{self._name.replace(' ', '_')}"
-        try:
-            self._fmi_name = coordinator.current.place
-        except Exception:
-            self._fmi_name = None
-
+        if only_name:
+            self._attr_name = f"{self._name}"
+        else:
+            base_name = coordinator.get_current_place()
+            if base_name is None:
+                base_name = name
+            self._attr_name = f"{base_name} {self._name}"
+        self._attr_extra_state_attributes = {ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION}
         self.update()
 
     def update(self):
         raise NotImplementedError(
             "Required update method is not implemented")
-
-    # This has not been working correctly so comment it out for now
-    # @property
-    # def unique_id(self):
-    #    return self._unique_id
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        if self._fmi_name is not None:
-            return f"{self._fmi_name} {self._name}"
-        return f"{self.client_name} {self._name}"
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement of this entity, if any."""
-        return self._unit_of_measurement
 
     @property
     def state_class(self):
@@ -110,13 +96,9 @@ class _BaseSensorClass(CoordinatorEntity):
         return SensorStateClass.MEASUREMENT
 
     @property
-    def icon(self):
-        """Icon to use in the frontend, if any."""
-        return self._icon
-
-    @property
     def state(self):
         """Return the state of the sensor."""
+        const._LOGGER.debug("FMI: updating sensor %s", self._attr_name)
         self.update()
         return self._state
 
@@ -124,30 +106,9 @@ class _BaseSensorClass(CoordinatorEntity):
 class FMIBestConditionSensor(_BaseSensorClass):
     """Implementation of a FMI Weather sensor with best conditions of the day."""
 
-    @_BaseSensorClass.name.getter
-    def name(self):
-        """Return the name of the sensor."""
-        if self._fmi_name is not None:
-            return f"{self._fmi_name} {self._name}"
-        return self._name
-
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
-        if self.type == "time":
-            _fmi = self._fmi
-            if _fmi is not None and _fmi.current is not None:
-                return {
-                    ha_const.ATTR_LOCATION: _fmi.current.place,
-                    ha_const.ATTR_TIME: _fmi.best_time,
-                    ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
-                    const.ATTR_HUMIDITY: _fmi.best_humidity,
-                    const.ATTR_PRECIPITATION: _fmi.best_precipitation,
-                    const.ATTR_WIND_SPEED: _fmi.best_wind_speed,
-                    ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
-                }
-
-        return {ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION}
+    def __init__(self, *args, **kwargs):
+        """Initialize the sensor."""
+        super().__init__(*args, **kwargs, only_name=True)
 
     @staticmethod
     def get_wind_direction_string(wind_direction_in_deg):
@@ -172,19 +133,28 @@ class FMIBestConditionSensor(_BaseSensorClass):
                 return "W"
             elif (293 < wind_direction_in_deg <= 338):
                 return "NW"
-        return "Unavailable"
+        return ha_const.STATE_UNAVAILABLE
 
     def update(self):
-        """Get the latest data from FMI and updates the states."""
-        _fmi = self._fmi
+        """Update the state of the weather sensor."""
+
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
         _type = self.type
-        if _fmi is None:
-            const._LOGGER.debug("FMI: Coordinator is not available")
-            return
 
         if _fmi.current is None:
             const._LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
+
+        # update the extra state attributes
+        self._attr_extra_state_attributes = {
+            ha_const.ATTR_LOCATION: _fmi.current.place,
+            ha_const.ATTR_TIME: _fmi.best_time,
+            ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
+            const.ATTR_HUMIDITY: _fmi.best_humidity,
+            const.ATTR_PRECIPITATION: _fmi.best_precipitation,
+            const.ATTR_WIND_SPEED: _fmi.best_wind_speed,
+            ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
+        }
 
         if _type == "place":
             self._state = _fmi.current.place
@@ -199,7 +169,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
         else:
             # Forecasted weather based on configured time_step - next forecasted hour, if available
 
-            if _fmi.forecast is None:
+            if _fmi.forecast is None or not _fmi.forecast.forecasts:
                 const._LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
@@ -207,18 +177,17 @@ class FMIBestConditionSensor(_BaseSensorClass):
             # otherwise fallback to the next hour
             if len(_fmi.forecast.forecasts) > 1:
                 curr_min = datetime.now().minute
-                if curr_min >= 30:
-                    source_data = _fmi.forecast.forecasts[1]
+                source_data = _fmi.forecast.forecasts[1 if curr_min >= 30 else 0]
             else:
                 source_data = _fmi.forecast.forecasts[0]
 
         if source_data is None:
+            self._state = ha_const.STATE_UNAVAILABLE
             const._LOGGER.debug("FMI: Sensor Source data is unavailable")
             return
 
-        _state = None
         if _type == "forecast_time":
-            _state = source_data.time.astimezone(tz.tzlocal())
+            _state = source_data.time.astimezone(tz.tzlocal()).strftime("%H:%M:%S")
         elif _type == "weather":
             _state = utils.get_weather_symbol(source_data.symbol.value)
         elif _type == "temperature":
@@ -226,7 +195,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
         elif _type == "wind_speed":
             _state = source_data.wind_speed.value
         elif _type == "wind_direction":
-            _state = "Unavailable"
+            _state = ha_const.STATE_UNAVAILABLE
             if source_data.wind_direction is not None:
                 _state = self.get_wind_direction_string(source_data.wind_direction.value)
         elif _type == "wind_gust":
@@ -238,7 +207,12 @@ class FMIBestConditionSensor(_BaseSensorClass):
         elif _type == "rain":
             _state = source_data.precipitation_amount.value
         elif _type == "time":
-            _state = _fmi.best_state
+            if _fmi.best_time is not None:
+                _state = _fmi.best_time.strftime("%H:%M:%S")
+            else:
+                _state = ha_const.STATE_UNAVAILABLE
+        else:
+            _state = ha_const.STATE_UNKNOWN
 
         self._state = _state
 
@@ -246,22 +220,22 @@ class FMIBestConditionSensor(_BaseSensorClass):
 class FMILightningStrikesSensor(_BaseSensorClass):
     """Implementation of a FMI Lightning strikes sensor."""
 
-    def __init__(self, name, coordinator, sensor_type, sensor_data):
-        """Initialize the sensor."""
-        self.lightning_data = coordinator.lightning_data
-        super().__init__(name, coordinator, sensor_type, sensor_data)
+    def update(self):
+        """Update the state of the lightning sensor."""
 
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
-        _data = self.lightning_data
-        if _data is None:
-            return []
+        const._LOGGER.debug("FMI: update lightning sensor %s", self._attr_name)
 
-        if len(_data) == 0:
-            return []
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        _data = _fmi.lightning_data
 
-        return {
+        if not _data:
+            const._LOGGER.debug("FMI: Sensor lightning is unavailable")
+            return
+
+        self._state = _data[0].location
+
+        # update the extra state attributes
+        self._attr_extra_state_attributes = {
             ha_const.ATTR_LOCATION: _data[0].location,
             ha_const.ATTR_TIME: _data[0].time,
             const.ATTR_DISTANCE: _data[0].distance,
@@ -284,54 +258,31 @@ class FMILightningStrikesSensor(_BaseSensorClass):
             ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }
 
-    def update(self):
-        """Get the latest data from FMI and update the states."""
-
-        try:
-            self._state = self.lightning_data[0].location
-        except Exception:
-            const._LOGGER.debug("FMI: Sensor Lightning is unavailable")
-            self._state = "Unavailable"
-
 
 class FMIMareoSensor(_BaseSensorClass):
     """Implementation of a FMI sea water level sensor."""
 
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
+    def update(self):
+        """Update the state of the mareo sensor."""
 
-        mareo_data = self._fmi.mareo_data.sea_levels
+        const._LOGGER.debug("FMI: update reo sensor %s", self._attr_name)
 
-        if mareo_data is None:
-            return []
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        mareo = _fmi.mareo_data
 
-        if len(mareo_data) > 1:
-            pass
-        elif len(mareo_data) > 0:
-            return {
-                ha_const.ATTR_TIME: mareo_data[0][0],
-                "FORECASTS": [],
-                ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION
-            }
-        else:
-            return []
+        if not mareo or not mareo.size():
+            const._LOGGER.debug("FMI: Sensor mareo is unavailable")
+            return
 
-        return {
-            ha_const.ATTR_TIME: mareo_data[0][0],
+        mareo_data = mareo.get_values()
+
+        self._state = mareo_data[0].sea_level
+
+        # update the extra state attributes
+        self._attr_extra_state_attributes = {
+            ha_const.ATTR_TIME: mareo_data[0].time,
             "FORECASTS": [
-                {"time": item[0], "height": item[1]} for item in mareo_data[1:]
+                {"time": item.time, "height": item.sea_level} for item in mareo_data[1:]
             ],
             ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }
-
-    def update(self):
-        """Get the latest data from FMI and update the states."""
-
-        mareo_data = self._fmi.mareo_data.sea_levels
-
-        try:
-            self._state = mareo_data[0][1]
-        except Exception:
-            const._LOGGER.debug("FMI: Sensor Mareo is unavailable")
-            self._state = "Unavailable"
