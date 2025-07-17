@@ -8,17 +8,20 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
-    ATTR_WEATHER_HUMIDITY,
-    ATTR_WEATHER_PRESSURE,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     WeatherEntity,
-    WeatherEntityFeature,
     Forecast,
+)
+from homeassistant.components.weather.const import (
+    ATTR_WEATHER_HUMIDITY,
+    ATTR_WEATHER_PRESSURE,
+    WeatherEntityFeature,
 )
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import FMIDataUpdateCoordinator
 from . import const
 from . import utils
 
@@ -48,149 +51,114 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         WeatherEntityFeature.FORECAST_DAILY
     )
 
-    def __init__(self, name, coordinator, daily_mode):
+    def __init__(self, name, coordinator: FMIDataUpdateCoordinator, daily_mode):
         """Initialize FMI weather object."""
         super().__init__(coordinator)
-        self._name = name
-        self._attrs = {}
-        self._unit_system = "Metric"
-        self._fmi = coordinator
         self._daily_mode = daily_mode
-        self._id = (
-            self.coordinator.unique_id
-            if not daily_mode
-            else f"{self.coordinator.unique_id}_daily"
-        )
-
-    @property
-    def name(self):
-        """Return the name of the place based on Lat / Long."""
-        if self._fmi is None or self._fmi.current is None:
-            return self._name
-
-        if self._daily_mode:
-            return f"{self._fmi.current.place} (daily)"
-        return self._fmi.current.place
-
-    @property
-    def attribution(self):
-        """Return the attribution."""
-        return const.ATTRIBUTION
-
-    @property
-    def unique_id(self):
-        """Return a unique_id for this entity."""
-        return self._id
-
-    @property
-    def device_info(self):
-        """Return the device info."""
-        info = {
-            "identifiers": {(const.DOMAIN, self.coordinator.unique_id)},
+        current = coordinator.current
+        if daily_mode and current:
+            self._attr_name = f"{current.place} (daily)"
+        else:
+            self._attr_name = current.place if current else name
+        self._attr_device_info = {
+            "identifiers": {(const.DOMAIN, coordinator.unique_id)},
             "name": const.NAME,
             "manufacturer": const.MANUFACTURER,
+            "entry_type": DeviceEntryType.SERVICE,
         }
-
-        info["entry_type"] = DeviceEntryType.SERVICE
-
-        return info
+        self._attr_attribution = const.ATTRIBUTION
+        self._attr_unique_id = (
+            coordinator.unique_id
+            if not daily_mode
+            else f"{coordinator.unique_id}_daily"
+        )
+        self._attr_native_temperature_unit = current.data.temperature.unit
+        self._attr_native_pressure_unit = current.data.pressure.unit
+        self._attr_native_wind_speed_unit = current.data.wind_speed.unit
 
     @property
     def available(self):
         """Return if weather data is available from FMI."""
-        if self._fmi is None:
-            return False
-
-        return self._fmi.current is not None
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        return _fmi.current is not None
 
     @property
     def native_temperature(self):
         """Return the temperature."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.temperature.value
-
-    @property
-    def native_temperature_unit(self):
-        """Return the unit of measurement."""
-        if self._fmi is None:
-            return None
-
-        return self._fmi.current.data.temperature.unit
+        return _fmi.current.data.temperature.value
 
     @property
     def humidity(self):
         """Return the humidity."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.humidity.value
+        return _fmi.current.data.humidity.value
 
     @property
     def native_precipitation(self):
         """Return the precipitation."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.precipitation_amount.value
+        return _fmi.current.data.precipitation_amount.value
 
     @property
     def native_wind_speed(self):
         """Return the wind speed."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return round(
-            self._fmi.current.data.wind_speed.value * 3.6, 1
-        )  # Convert m/s to km/h
+        return _fmi.current.data.wind_speed.value
 
     @property
     def wind_bearing(self):
         """Return the wind bearing."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.wind_direction.value
+        return _fmi.current.data.wind_direction.value
 
     @property
     def native_pressure(self):
         """Return the pressure."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.pressure.value
+        return _fmi.current.data.pressure.value
 
     @property
     def native_dew_point(self) -> float | None:
         """Return the dew point."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return self._fmi.current.data.dew_point.value
+        return _fmi.current.data.dew_point.value
 
     @property
     def condition(self):
         """Return the condition."""
-        if self._fmi is None:
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.current is None:
             return None
-
-        return utils.get_weather_symbol(self._fmi.current.data.symbol.value, self._fmi.hass)
+        return utils.get_weather_symbol(_fmi.current.data.symbol.value, _fmi.hass)
 
     def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
-        if self._fmi is None:
-            const._LOGGER.debug("FMI: Coordinator is not available")
-            return None
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        _forecasts = _fmi.forecast
 
-        if self._fmi.forecast is None:
+        if _forecasts is None:
             return None
 
         if daily_mode or self._daily_mode:
             # Daily mode, aggregate forecast for every day
             day = 0
             data = []
-            for forecast in self._fmi.forecast.forecasts:
+            for forecast in _forecasts.forecasts:
                 fc_time = forecast.time.astimezone(tz.tzlocal())
                 if day != fc_time.day:
                     day = fc_time.day
@@ -214,7 +182,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                         data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] = forecast.temperature.value
         else:
             data = []
-            for forecast in self._fmi.forecast.forecasts:
+            for forecast in _forecasts.forecasts:
                 fc_time = forecast.time.astimezone(tz.tzlocal())
                 data.append(
                     {
@@ -246,4 +214,5 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     async def async_update(self) -> None:
         """Get the latest weather data."""
-        await self._fmi.async_refresh()
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        await _fmi.async_refresh()
