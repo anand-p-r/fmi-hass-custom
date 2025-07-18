@@ -3,39 +3,40 @@
 import math
 from datetime import date, datetime
 from dateutil import tz
-from .const import (
-    BOUNDING_BOX_LAT_MAX,
-    BOUNDING_BOX_LAT_MIN,
-    BOUNDING_BOX_LONG_MAX,
-    BOUNDING_BOX_LONG_MIN,
-    FMI_WEATHER_SYMBOL_MAP,
-)
 from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.const import SUN_EVENT_SUNSET, SUN_EVENT_SUNRISE
 
+try:
+    from . import const
+except ImportError:
+    import const
 
-class BoundingBox(object):
-    def __init__(self, *args, **kwargs):
-        self.lat_min = None
-        self.lon_min = None
-        self.lat_max = None
-        self.lon_max = None
+
+class BoundingBox():
+    def __init__(self, lat_min=None, lon_min=None,
+                 lat_max=None, lon_max=None):
+        self.lat_min = lat_min
+        self.lon_min = lon_min
+        self.lat_max = lat_max
+        self.lon_max = lon_max
 
 
 def get_bounding_box_covering_finland():
+    """Bounding box to covert while Finland."""
     box = BoundingBox()
-    box.lat_min = BOUNDING_BOX_LAT_MIN
-    box.lon_min = BOUNDING_BOX_LONG_MIN
-    box.lat_max = BOUNDING_BOX_LAT_MAX
-    box.lon_max = BOUNDING_BOX_LONG_MAX
+    box.lat_min = const.BOUNDING_BOX_LAT_MIN
+    box.lon_min = const.BOUNDING_BOX_LONG_MIN
+    box.lat_max = const.BOUNDING_BOX_LAT_MAX
+    box.lon_max = const.BOUNDING_BOX_LONG_MAX
 
     return box
 
 
 def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km):
-    assert half_side_in_km > 0
-    assert latitude_in_degrees >= -90.0 and latitude_in_degrees <= 90.0
-    assert longitude_in_degrees >= -180.0 and longitude_in_degrees <= 180.0
+    """Calculate min and max coordinates for bounding box."""
+    assert 0 < half_side_in_km
+    assert -90.0 <= latitude_in_degrees <= 90.0
+    assert -180.0 <= longitude_in_degrees <= 180.0
 
     lat = math.radians(latitude_in_degrees)
     lon = math.radians(longitude_in_degrees)
@@ -61,20 +62,22 @@ def get_bounding_box(latitude_in_degrees, longitude_in_degrees, half_side_in_km)
 
 def get_weather_symbol(symbol, hass=None):
     """Get a weather symbol for the symbol value."""
-    ret_val = ""
-    if symbol in FMI_WEATHER_SYMBOL_MAP.keys():
-        ret_val = FMI_WEATHER_SYMBOL_MAP[symbol]
-        if hass is not None and ret_val == 1:  # Clear as per FMI
-            today = date.today()
-            sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, today)
-            sunset = sunset.astimezone(tz.tzlocal())
+    ret_val = const.FMI_WEATHER_SYMBOL_MAP.get(symbol, "")
 
-            sunrise = get_astral_event_date(hass, SUN_EVENT_SUNRISE, today)
-            sunrise = sunrise.astimezone(tz.tzlocal())
+    if hass is None or symbol != 1:  # was ret_val != 1 <- always False
+        return ret_val
 
-            if (datetime.now().astimezone(tz.tzlocal()) <= sunrise) or (
-                datetime.now().astimezone(tz.tzlocal()) >= sunset
-            ):
-                # Clear night
-                ret_val = FMI_WEATHER_SYMBOL_MAP[0]
+    # Clear as per FMI
+    today = date.today()
+    sunset = get_astral_event_date(hass, SUN_EVENT_SUNSET, today)
+    sunset = sunset.astimezone(tz.tzlocal())
+
+    sunrise = get_astral_event_date(hass, SUN_EVENT_SUNRISE, today)
+    sunrise = sunrise.astimezone(tz.tzlocal())
+
+    time_now = datetime.now().astimezone(tz.tzlocal())
+    if time_now <= sunrise or time_now >= sunset:
+        # Clear night
+        ret_val = const.FMI_WEATHER_SYMBOL_MAP[0]
+
     return ret_val

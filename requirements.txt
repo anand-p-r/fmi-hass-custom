@@ -1,0 +1,9 @@
+python-dateutil
+async-timeout
+voluptuous
+requests>=2.32.4
+fmi-weather-client>=0.7.0
+geopy>=2.1.0
+xmltodict>=0.14.2
+flake8
+pylint

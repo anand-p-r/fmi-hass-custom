@@ -1,8 +1,9 @@
 """Support for weather service from FMI (Finnish Meteorological Institute) for sensor platform."""
 
+import enum
+import math
 from datetime import datetime
 from dateutil import tz
-
 # Import homeassistant platform dependencies
 import homeassistant.const as ha_const
 from homeassistant.components.sensor import SensorStateClass
@@ -13,26 +14,46 @@ from . import utils
 from . import const
 
 
+class SensorType(enum.IntEnum):
+    PLACE = enum.auto()
+    WEATHER = enum.auto()
+    TEMPERATURE = enum.auto()
+    WIND_SPEED = enum.auto()
+    WIND_DIR = enum.auto()
+    WIND_GUST = enum.auto()
+    HUMIDITY = enum.auto()
+    CLOUDS = enum.auto()
+    RAIN = enum.auto()
+    TIME_FORECAST = enum.auto()
+    TIME = enum.auto()
+    LIGHTNING = enum.auto()
+    SEA_LEVEL = enum.auto()
+
+
 SENSOR_TYPES = {
-    "place": ["Place", None, "mdi:city-variant"],
-    "weather": ["Condition", None, None],
-    "temperature": ["Temperature", ha_const.UnitOfTemperature.CELSIUS, "mdi:thermometer"],
-    "wind_speed": ["Wind Speed", ha_const.UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
-    "wind_direction": ["Wind Direction", "", "mdi:weather-windy"],
-    "wind_gust": ["Wind Gust", ha_const.UnitOfSpeed.METERS_PER_SECOND, "mdi:weather-windy"],
-    "humidity": ["Humidity", ha_const.PERCENTAGE, "mdi:water"],
-    "clouds": ["Cloud Coverage", ha_const.PERCENTAGE, "mdi:weather-cloudy"],
-    "rain": ["Rain", ha_const.UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR, "mdi:weather-pouring"],
-    "forecast_time": ["Time", None, "mdi:av-timer"],
-    "time": ["Best Time Of Day", None, "mdi:av-timer"],
+    SensorType.PLACE: ["Place", None, "mdi:city-variant"],
+    SensorType.WEATHER: ["Condition", None, None],
+    SensorType.TEMPERATURE: ["Temperature", ha_const.UnitOfTemperature.CELSIUS,
+                             "mdi:thermometer"],
+    SensorType.WIND_SPEED: ["Wind Speed", ha_const.UnitOfSpeed.METERS_PER_SECOND,
+                            "mdi:weather-windy"],
+    SensorType.WIND_DIR: ["Wind Direction", "", "mdi:weather-windy"],
+    SensorType.WIND_GUST: ["Wind Gust", ha_const.UnitOfSpeed.METERS_PER_SECOND,
+                           "mdi:weather-windy"],
+    SensorType.HUMIDITY: ["Humidity", ha_const.PERCENTAGE, "mdi:water"],
+    SensorType.CLOUDS: ["Cloud Coverage", ha_const.PERCENTAGE, "mdi:weather-cloudy"],
+    SensorType.RAIN: ["Rain", ha_const.UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR,
+                      "mdi:weather-pouring"],
+    SensorType.TIME_FORECAST: ["Time", None, "mdi:av-timer"],
+    SensorType.TIME: ["Best Time Of Day", None, "mdi:av-timer"],
 }
 
 SENSOR_LIGHTNING_TYPES = {
-    "lightning": ["Lightning Strikes", None, "mdi:weather-lightning"]
+    SensorType.LIGHTNING: ["Lightning Strikes", None, "mdi:weather-lightning"]
 }
 
 SENSOR_MAREO_TYPES = {
-    "sea_level": ["Sea Level", ha_const.UnitOfLength.CENTIMETERS, "mdi:waves"]
+    SensorType.SEA_LEVEL: ["Sea Level", ha_const.UnitOfLength.CENTIMETERS, "mdi:waves"]
 }
 
 PARALLEL_UPDATES = 1
@@ -65,7 +86,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
 
 class _BaseSensorClass(CoordinatorEntity):
-    """Common base class for all the sensor types"""
+    """Common base class for all the sensor types."""
 
     def __init__(self, name, coordinator, sensor_type, sensor_data, only_name=None):
         """Initialize the sensor base data."""
@@ -87,6 +108,7 @@ class _BaseSensorClass(CoordinatorEntity):
         self.update()
 
     def update(self):
+        """Update method prototype."""
         raise NotImplementedError(
             "Required update method is not implemented")
 
@@ -98,7 +120,7 @@ class _BaseSensorClass(CoordinatorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        const._LOGGER.debug("FMI: updating sensor %s", self._attr_name)
+        const.LOGGER.debug("FMI: updating sensor %s", self._attr_name)
         self.update()
         return self._state
 
@@ -106,43 +128,104 @@ class _BaseSensorClass(CoordinatorEntity):
 class FMIBestConditionSensor(_BaseSensorClass):
     """Implementation of a FMI Weather sensor with best conditions of the day."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name, coordinator, sensor_type, sensor_data):
         """Initialize the sensor."""
-        super().__init__(*args, **kwargs, only_name=True)
+        self.update_state_func = {
+            SensorType.WEATHER: self.__update_weather,
+            SensorType.TEMPERATURE: self.__update_temperature,
+            SensorType.WIND_SPEED: self.__update_wind_speed,
+            SensorType.WIND_DIR: self.__update_wind_direction,
+            SensorType.WIND_GUST: self.__update_wind_gust,
+            SensorType.HUMIDITY: self.__update_humidity,
+            SensorType.CLOUDS: self.__update_clouds,
+            SensorType.RAIN: self.__update_rain,
+            SensorType.TIME_FORECAST: self.__update_forecast_time,
+            SensorType.TIME: self.__update_time,
+        }.get(sensor_type, self.__update_dummy)
+        super().__init__(name, coordinator, sensor_type, sensor_data, only_name=True)
 
     @staticmethod
     def get_wind_direction_string(wind_direction_in_deg):
         """Get the string interpretation of wind direction in degrees."""
 
-        if wind_direction_in_deg is not None:
-            if wind_direction_in_deg <=23:
-                return "N"
-            elif wind_direction_in_deg > 338:
-                return "N"
-            elif (23 < wind_direction_in_deg <= 68):
-                return "NE"
-            elif (68 < wind_direction_in_deg <= 113):
-                return "E"
-            elif (113 < wind_direction_in_deg <= 158):
-                return "SE"
-            elif (158 < wind_direction_in_deg <= 203):
-                return "S"
-            elif (203 < wind_direction_in_deg <= 248):
-                return "SW"
-            elif (248 < wind_direction_in_deg <= 293):
-                return "W"
-            elif (293 < wind_direction_in_deg <= 338):
-                return "NW"
+        if wind_direction_in_deg is None or \
+                wind_direction_in_deg < 0 or wind_direction_in_deg > 360:
+            return ha_const.STATE_UNAVAILABLE
+
+        if wind_direction_in_deg <= 23 or wind_direction_in_deg > 338:
+            return "N"
+        if 23 < wind_direction_in_deg <= 68:
+            return "NE"
+        if 68 < wind_direction_in_deg <= 113:
+            return "E"
+        if 113 < wind_direction_in_deg <= 158:
+            return "SE"
+        if 158 < wind_direction_in_deg <= 203:
+            return "S"
+        if 203 < wind_direction_in_deg <= 248:
+            return "SW"
+        if 248 < wind_direction_in_deg <= 293:
+            return "W"
+        if 293 < wind_direction_in_deg <= 338:
+            return "NW"
         return ha_const.STATE_UNAVAILABLE
+
+    def __convert_float(self, source_data, name):
+        value = getattr(source_data, name)
+        if value is None or math.isnan(value.value):
+            self._state = ha_const.STATE_UNAVAILABLE
+            return
+        self._state = value.value
+
+    def __update_dummy(self, source_data):
+        _ = source_data
+        self._state = ha_const.STATE_UNKNOWN
+
+    def __update_forecast_time(self, source_data):
+        self._state = source_data.time.astimezone(tz.tzlocal()).strftime("%H:%M")
+
+    def __update_weather(self, source_data):
+        self._state = utils.get_weather_symbol(source_data.symbol.value)
+
+    def __update_temperature(self, source_data):
+        self.__convert_float(source_data, "temperature")
+
+    def __update_wind_speed(self, source_data):
+        self.__convert_float(source_data, "wind_speed")
+
+    def __update_wind_direction(self, source_data):
+        if source_data.wind_direction is None:
+            self._state = ha_const.STATE_UNAVAILABLE
+            return
+        self._state = self.get_wind_direction_string(source_data.wind_direction.value)
+
+    def __update_wind_gust(self, source_data):
+        self.__convert_float(source_data, "wind_gust")
+
+    def __update_humidity(self, source_data):
+        self.__convert_float(source_data, "humidity")
+
+    def __update_clouds(self, source_data):
+        self.__convert_float(source_data, "cloud_cover")
+
+    def __update_rain(self, source_data):
+        self.__convert_float(source_data, "precipitation_amount")
+
+    def __update_time(self, source_data):
+        _ = source_data
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        if _fmi.best_time is None:
+            self._state = ha_const.STATE_UNAVAILABLE
+            return
+        self._state = _fmi.best_time.strftime("%H:%M")
 
     def update(self):
         """Update the state of the weather sensor."""
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
-        _type = self.type
 
         if _fmi.current is None:
-            const._LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
+            const.LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
 
         # update the extra state attributes
@@ -156,7 +239,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
             ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION,
         }
 
-        if _type == "place":
+        if self.type == SensorType.PLACE:
             self._state = _fmi.current.place
             return
 
@@ -170,7 +253,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
             # Forecasted weather based on configured time_step - next forecasted hour, if available
 
             if _fmi.forecast is None or not _fmi.forecast.forecasts:
-                const._LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
+                const.LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
             # If current time is half past or more then use the hour next to next hour
@@ -183,38 +266,10 @@ class FMIBestConditionSensor(_BaseSensorClass):
 
         if source_data is None:
             self._state = ha_const.STATE_UNAVAILABLE
-            const._LOGGER.debug("FMI: Sensor Source data is unavailable")
+            const.LOGGER.debug("FMI: Sensor Source data is unavailable")
             return
 
-        if _type == "forecast_time":
-            _state = source_data.time.astimezone(tz.tzlocal()).strftime("%H:%M:%S")
-        elif _type == "weather":
-            _state = utils.get_weather_symbol(source_data.symbol.value)
-        elif _type == "temperature":
-            _state = source_data.temperature.value
-        elif _type == "wind_speed":
-            _state = source_data.wind_speed.value
-        elif _type == "wind_direction":
-            _state = ha_const.STATE_UNAVAILABLE
-            if source_data.wind_direction is not None:
-                _state = self.get_wind_direction_string(source_data.wind_direction.value)
-        elif _type == "wind_gust":
-            _state = source_data.wind_gust.value
-        elif _type == "humidity":
-            _state = source_data.humidity.value
-        elif _type == "clouds":
-            _state = source_data.cloud_cover.value
-        elif _type == "rain":
-            _state = source_data.precipitation_amount.value
-        elif _type == "time":
-            if _fmi.best_time is not None:
-                _state = _fmi.best_time.strftime("%H:%M:%S")
-            else:
-                _state = ha_const.STATE_UNAVAILABLE
-        else:
-            _state = ha_const.STATE_UNKNOWN
-
-        self._state = _state
+        self.update_state_func(source_data)
 
 
 class FMILightningStrikesSensor(_BaseSensorClass):
@@ -223,13 +278,13 @@ class FMILightningStrikesSensor(_BaseSensorClass):
     def update(self):
         """Update the state of the lightning sensor."""
 
-        const._LOGGER.debug("FMI: update lightning sensor %s", self._attr_name)
+        const.LOGGER.debug("FMI: update lightning sensor %s", self._attr_name)
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         _data = _fmi.lightning_data
 
         if not _data:
-            const._LOGGER.debug("FMI: Sensor lightning is unavailable")
+            const.LOGGER.debug("FMI: Sensor lightning is unavailable")
             return
 
         self._state = _data[0].location
@@ -265,13 +320,13 @@ class FMIMareoSensor(_BaseSensorClass):
     def update(self):
         """Update the state of the mareo sensor."""
 
-        const._LOGGER.debug("FMI: update reo sensor %s", self._attr_name)
+        const.LOGGER.debug("FMI: update reo sensor %s", self._attr_name)
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         mareo = _fmi.mareo_data
 
         if not mareo or not mareo.size():
-            const._LOGGER.debug("FMI: Sensor mareo is unavailable")
+            const.LOGGER.debug("FMI: Sensor mareo is unavailable")
             return
 
         mareo_data = mareo.get_values()
