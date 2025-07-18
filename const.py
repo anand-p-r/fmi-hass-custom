@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import logging
 
-_LOGGER = logging.getLogger(__package__)
+LOGGER = logging.getLogger(__package__)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 DOMAIN = "fmi"
@@ -77,13 +77,22 @@ BOUNDING_BOX_HALF_SIDE_KM = 200
 LIGHTNING_DAYS_LIMIT = 1
 LIGHTNING_LIMIT = 5
 
-BASE_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::lightning::multipointcoverage&timestep=3600&"
-# Constants for Mareograph data
-BASE_MAREO_FORC_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::sealevel::point::simple&timestep=30&"
+URL_FMI_BASE = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0" \
+    "&request=getFeature&storedquery_id="
 
-#BASE_MAREO_OBS_URL = "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::mareograph::simple&fmisid=132310&timestep=30"
-# example: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.4&starttime=2021-04-11T13:24:00Z
-#future maybe for sea temperature: http://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::forecast::oaas::sealevel::point::simple&timestep=30&latlon=60.0,24.0&starttime=2021-04-11T13:24:00Z
+LIGHTNING_QUERY_ID = "fmi::observations::lightning::multipointcoverage"
+LIGHTNING_GET_URL = f"{URL_FMI_BASE}{LIGHTNING_QUERY_ID}&timestep=3600&"
+
+MAREO_QUERY_ID = "fmi::forecast::sealevel::point::simple"
+MAREO_GET_URL = f"{URL_FMI_BASE}{MAREO_QUERY_ID}&timestep=30&"
+
+# MAREO_OBS_QUERY_ID = "fmi::observations::mareograph::simple"
+# MAREO_OBS_GET_URL = f"{URL_FMI_BASE}{MAREO_OBS_QUERY_ID}&fmisid=132310&timestep=30"
+
+# MAREO_SEA_TEMP_QUERY_ID = "fmi::forecast::oaas::sealevel::point::simple"
+# MAREO_SEA_TEMP_GET_URL = f"{URL_FMI_BASE}{MAREO_OBS_QUERY_ID}&timestep=30" \
+#     "&latlon=60.0,24.0&starttime=2021-04-11T13:24:00Z"
+#
 
 # FMI Weather Visibility Constants
 FMI_WEATHER_SYMBOL_MAP = {

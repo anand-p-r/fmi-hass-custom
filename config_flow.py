@@ -39,7 +39,7 @@ async def validate_user_config(hass: core.HomeAssistant, data):
             + err.message
         )
         errors = "client_connect_error"
-        const._LOGGER.error(err_string)
+        const.LOGGER.error(err_string)
     except fmi_erros.ServerError as err:
         err_string = (
             "Server error with status "
@@ -48,7 +48,7 @@ async def validate_user_config(hass: core.HomeAssistant, data):
             + err.body
         )
         errors = "server_connect_error"
-        const._LOGGER.error(err_string)
+        const.LOGGER.error(err_string)
 
     return {"place": "None", "err": errors}
 
@@ -98,6 +98,7 @@ class FMIConfigFlowHandler(config_entries.ConfigFlow, domain="fmi"):
     @core.callback
     def async_get_options_flow(config_entry):
         """Options callback for FMI."""
+        _ = config_entry
         return FMIOptionsFlowHandler()
 
 
@@ -106,10 +107,12 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
 
     @property
     def config_entry(self):
+        """Return the config entry linked to the current options flow."""
         return self.hass.config_entries.async_get_entry(self.handler)
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
+        _ = user_input
         return await self.async_step_user()
 
     async def async_step_user(self, user_input=None):
@@ -121,36 +124,62 @@ class FMIOptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                vol.Optional(const.CONF_FORECAST_DAYS, default=_options.get(
-                    const.CONF_FORECAST_DAYS, const.DAYS_DEFAULT)): vol.In(const.DAYS_RANGE),
-                vol.Optional(ha_const.CONF_OFFSET, default=_options.get(
-                    ha_const.CONF_OFFSET, const.FORECAST_OFFSET[0])): vol.In(const.FORECAST_OFFSET),
-                vol.Optional(const.CONF_MIN_HUMIDITY, default=_options.get(
-                    const.CONF_MIN_HUMIDITY, const.HUMIDITY_MIN_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
-                vol.Optional(const.CONF_MAX_HUMIDITY, default=_options.get(
-                    const.CONF_MAX_HUMIDITY, const.HUMIDITY_MAX_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
-                vol.Optional(const.CONF_MIN_TEMP, default=_options.get(
-                    const.CONF_MIN_TEMP, const.TEMP_MIN_DEFAULT)): vol.In(const.TEMP_RANGE),
-                vol.Optional(const.CONF_MAX_TEMP, default=_options.get(
-                    const.CONF_MAX_TEMP, const.TEMP_MAX_DEFAULT)): vol.In(const.TEMP_RANGE),
-                vol.Optional(const.CONF_MIN_WIND_SPEED, default=_options.get(
-                    const.CONF_MIN_WIND_SPEED, const.WIND_SPEED_MIN_DEFAULT)): vol.In(const.WIND_SPEED),
-                vol.Optional(const.CONF_MAX_WIND_SPEED, default=_options.get(
-                    const.CONF_MAX_WIND_SPEED, const.WIND_SPEED_MAX_DEFAULT)): vol.In(const.WIND_SPEED),
-                vol.Optional(const.CONF_MIN_PRECIPITATION, default=_options.get(
-                    const.CONF_MIN_PRECIPITATION, const.PRECIPITATION_MIN_DEFAULT)): cv.small_float,
-                vol.Optional(const.CONF_MAX_PRECIPITATION, default=_options.get(
-                    const.CONF_MAX_PRECIPITATION, const.PRECIPITATION_MAX_DEFAULT)): cv.small_float,
-                vol.Optional(const.CONF_DAILY_MODE, default=_options.get(
-                    const.CONF_DAILY_MODE, const.DAILY_MODE_DEFAULT)): cv.boolean,
-                vol.Optional(const.CONF_LIGHTNING, default=_options.get(
-                    const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT)): cv.boolean,
-                vol.Optional(const.CONF_LIGHTNING_DISTANCE, default=_options.get(
-                    const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM)): cv.positive_int,
-                vol.Optional(const.CONF_OBSERVATION_EN, default=_options.get(
-                    const.CONF_OBSERVATION_EN, const.OBSERVATION_DEFAULT)): cv.boolean,
-                }
-            )
+            data_schema=vol.Schema({
+                vol.Optional(const.CONF_FORECAST_DAYS,
+                             default=_options.get(
+                                 const.CONF_FORECAST_DAYS,
+                                 const.DAYS_DEFAULT)): vol.In(const.DAYS_RANGE),
+                vol.Optional(ha_const.CONF_OFFSET,
+                             default=_options.get(
+                                 ha_const.CONF_OFFSET,
+                                 const.FORECAST_OFFSET[0])): vol.In(const.FORECAST_OFFSET),
+                vol.Optional(const.CONF_MIN_HUMIDITY,
+                             default=_options.get(
+                                 const.CONF_MIN_HUMIDITY,
+                                 const.HUMIDITY_MIN_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MAX_HUMIDITY,
+                             default=_options.get(
+                                 const.CONF_MAX_HUMIDITY,
+                                 const.HUMIDITY_MAX_DEFAULT)): vol.In(const.HUMIDITY_RANGE),
+                vol.Optional(const.CONF_MIN_TEMP,
+                             default=_options.get(
+                                 const.CONF_MIN_TEMP,
+                                 const.TEMP_MIN_DEFAULT)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MAX_TEMP,
+                             default=_options.get(
+                                 const.CONF_MAX_TEMP,
+                                 const.TEMP_MAX_DEFAULT)): vol.In(const.TEMP_RANGE),
+                vol.Optional(const.CONF_MIN_WIND_SPEED,
+                             default=_options.get(
+                                 const.CONF_MIN_WIND_SPEED,
+                                 const.WIND_SPEED_MIN_DEFAULT)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MAX_WIND_SPEED,
+                             default=_options.get(
+                                 const.CONF_MAX_WIND_SPEED,
+                                 const.WIND_SPEED_MAX_DEFAULT)): vol.In(const.WIND_SPEED),
+                vol.Optional(const.CONF_MIN_PRECIPITATION,
+                             default=_options.get(
+                                 const.CONF_MIN_PRECIPITATION,
+                                 const.PRECIPITATION_MIN_DEFAULT)): cv.small_float,
+                vol.Optional(const.CONF_MAX_PRECIPITATION,
+                             default=_options.get(
+                                 const.CONF_MAX_PRECIPITATION,
+                                 const.PRECIPITATION_MAX_DEFAULT)): cv.small_float,
+                vol.Optional(const.CONF_DAILY_MODE,
+                             default=_options.get(
+                                 const.CONF_DAILY_MODE,
+                                 const.DAILY_MODE_DEFAULT)): cv.boolean,
+                vol.Optional(const.CONF_LIGHTNING,
+                             default=_options.get(
+                                 const.CONF_LIGHTNING,
+                                 const.LIGHTNING_DEFAULT)): cv.boolean,
+                vol.Optional(const.CONF_LIGHTNING_DISTANCE,
+                             default=_options.get(
+                                 const.CONF_LIGHTNING_DISTANCE,
+                                 const.BOUNDING_BOX_HALF_SIDE_KM)): cv.positive_int,
+                vol.Optional(const.CONF_OBSERVATION_EN,
+                             default=_options.get(
+                                 const.CONF_OBSERVATION_EN,
+                                 const.OBSERVATION_DEFAULT)): cv.boolean,
+            })
         )

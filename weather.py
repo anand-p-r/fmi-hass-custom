@@ -165,7 +165,8 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     data.append(
                         {
                             ATTR_FORECAST_TIME: fc_time.isoformat(),
-                            ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
+                            ATTR_FORECAST_CONDITION: utils.get_weather_symbol(
+                                forecast.symbol.value),
                             ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.temperature.value,
                             ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
