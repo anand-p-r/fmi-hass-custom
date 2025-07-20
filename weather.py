@@ -33,12 +33,20 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add an FMI weather entity from a config_entry."""
     name = config_entry.data[CONF_NAME]
     daily_mode = config_entry.options.get(const.CONF_DAILY_MODE, False)
+    station_id = bool(config_entry.options.get(const.CONF_OBSERVATION_STATION, 0))
 
     coordinator = hass.data[const.DOMAIN][config_entry.entry_id][const.COORDINATOR]
 
-    entity_list = [FMIWeatherEntity(name, coordinator, False)]
+    entity_list = [FMIWeatherEntity(name, coordinator)]
     if daily_mode:
-        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator, True))
+        entity_list.append(FMIWeatherEntity(f"{name} (daily)", coordinator,
+                                            daily_mode=True))
+    if station_id:
+        try:
+            entity_list.append(FMIWeatherEntity(f"{name} (observation)", coordinator,
+                                                station_id=station_id))
+        except AttributeError:
+            const.LOGGER.error("Unable to setup observation object!")
 
     async_add_entities(entity_list, False)
 
@@ -51,15 +59,24 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         WeatherEntityFeature.FORECAST_DAILY
     )
 
-    def __init__(self, name, coordinator: FMIDataUpdateCoordinator, daily_mode):
+    def __init__(self, name, coordinator: FMIDataUpdateCoordinator,
+                 station_id: bool = False, daily_mode: bool = False):
         """Initialize FMI weather object."""
         super().__init__(coordinator)
         self._daily_mode = daily_mode
-        current = coordinator.current
-        if daily_mode and current:
-            self._attr_name = f"{current.place} (daily)"
-        else:
-            self._attr_name = current.place if current else name
+        self._observation_mode = station_id
+        self._data_func = coordinator.get_observation if station_id else coordinator.get_weather
+        _weather = self._data_func()
+        _attr_name = [_weather.place if _weather else name]
+        _attr_unique_id = [f"{coordinator.unique_id}"]
+        if daily_mode:
+            _attr_name.append("(daily)")
+            _attr_unique_id.append("daily")
+        elif station_id:
+            _attr_name.append("(observation)")
+            _attr_unique_id.append("observation")
+        self._attr_name = " ".join(_attr_name)
+        self._attr_unique_id = "_".join(_attr_unique_id)
         self._attr_device_info = {
             "identifiers": {(const.DOMAIN, coordinator.unique_id)},
             "name": const.NAME,
@@ -67,98 +84,91 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             "entry_type": DeviceEntryType.SERVICE,
         }
         self._attr_attribution = const.ATTRIBUTION
-        self._attr_unique_id = (
-            coordinator.unique_id
-            if not daily_mode
-            else f"{coordinator.unique_id}_daily"
-        )
-        self._attr_native_temperature_unit = current.data.temperature.unit
-        self._attr_native_pressure_unit = current.data.pressure.unit
-        self._attr_native_wind_speed_unit = current.data.wind_speed.unit
+        self._attr_native_temperature_unit = _weather.data.temperature.unit
+        self._attr_native_pressure_unit = _weather.data.pressure.unit
+        self._attr_native_wind_speed_unit = _weather.data.wind_speed.unit
 
     @property
     def available(self):
         """Return if weather data is available from FMI."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        return _fmi.current is not None
+        return self._data_func() is not None
 
     @property
     def native_temperature(self):
         """Return the temperature."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.temperature.value
+        return _weather.data.temperature.value
 
     @property
     def humidity(self):
         """Return the humidity."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.humidity.value
+        return _weather.data.humidity.value
 
     @property
     def native_precipitation(self):
         """Return the precipitation."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.precipitation_amount.value
+        return _weather.data.precipitation_amount.value
 
     @property
     def native_wind_speed(self):
         """Return the wind speed."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.wind_speed.value
+        return _weather.data.wind_speed.value
 
     @property
     def wind_bearing(self):
         """Return the wind bearing."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.wind_direction.value
+        return _weather.data.wind_direction.value
 
     @property
     def native_pressure(self):
         """Return the pressure."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.pressure.value
+        return _weather.data.pressure.value
 
     @property
     def native_dew_point(self) -> float | None:
         """Return the dew point."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return _fmi.current.data.dew_point.value
+        return _weather.data.dew_point.value
 
     @property
     def condition(self):
         """Return the condition."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        if _fmi.current is None:
+        _weather = self._data_func()
+        if _weather is None:
             return None
-        return utils.get_weather_symbol(_fmi.current.data.symbol.value, _fmi.hass)
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        return utils.get_weather_symbol(_weather.data.symbol.value, _fmi.hass)
 
     def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
-        _forecasts = _fmi.forecast
 
-        if _forecasts is None:
-            return None
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        _forecasts = _fmi.get_forecasts()
+        data = []
 
         if daily_mode or self._daily_mode:
             # Daily mode, aggregate forecast for every day
             day = 0
-            data = []
-            for forecast in _forecasts.forecasts:
+            for forecast in _forecasts:
                 fc_time = forecast.time.astimezone(tz.tzlocal())
                 if day != fc_time.day:
                     day = fc_time.day
@@ -181,23 +191,22 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                         data[-1][ATTR_FORECAST_NATIVE_TEMP] = forecast.temperature.value
                     if data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] > forecast.temperature.value:
                         data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] = forecast.temperature.value
-        else:
-            data = []
-            for forecast in _forecasts.forecasts:
-                fc_time = forecast.time.astimezone(tz.tzlocal())
-                data.append(
-                    {
-                        ATTR_FORECAST_TIME: fc_time.isoformat(),
-                        ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
-                        ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
-                        ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
-                        ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
-                        ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                        ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                        ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-                    }
-                )
+            return data
 
+        for forecast in _forecasts:
+            fc_time = forecast.time.astimezone(tz.tzlocal())
+            data.append(
+                {
+                    ATTR_FORECAST_TIME: fc_time.isoformat(),
+                    ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
+                    ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
+                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
+                    ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
+                    ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                    ATTR_WEATHER_PRESSURE: forecast.pressure.value,
+                    ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                }
+            )
         return data
 
     @property

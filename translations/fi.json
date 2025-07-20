@@ -36,7 +36,7 @@
                     "daily_mode": "Aktivoi vuorokausiennuste-entiteetti",
                     "lightning_sensor": "Aktivoi ukkostutka",
                     "lightning_radius": "Ukkostutkan säde km",
-                    "observation_enabled": "Ota havainnot käyttöön"
+                    "observation_station_id": "FMI:n havaintoaseman ID"
                 },
                 "description": "Maksimin ja minimin sisältävät parametrit käytetään määrittämään päivän parhaan ajan",
                 "title": "Ilmatieteen laitos asetukset"
