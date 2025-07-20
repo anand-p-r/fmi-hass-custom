@@ -175,10 +175,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT))
         self.lightning_radius = int(_options.get(
             const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM))
-        self.observation_enabled = bool(_options.get(
-            const.CONF_OBSERVATION_EN, const.OBSERVATION_DEFAULT))
+        self.observation_station_id = int(_options.get(const.CONF_OBSERVATION_STATION, 0))
 
+        # Observation data if the station id is set and valid
+        self.observation: typing.Optional[fmi_models.Weather] = None
+        # Current weather based on forecast for selected coordinates
+        # Note: this is an estimation received from FMI
         self.current: typing.Optional[fmi_models.Weather] = None
+        # Next day(s) forecasts
         self.forecast: typing.Optional[fmi_models.Forecast] = None
 
         # Best Time Attributes derived based on forecast weather data
@@ -202,34 +206,46 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(hass, LOGGER, config_entry=config_entry,
                          name=const.DOMAIN, update_interval=min_update_time)
 
-    def get_current(self):
+    def get_observation(self) -> typing.Optional[fmi_models.Weather]:
+        """Return the current observation data."""
+        return self.observation
+
+    def get_weather(self) -> typing.Optional[fmi_models.Weather]:
         """Return the current weather data."""
         return self.current
 
-    def get_current_place(self):
+    def get_forecasts(self) -> typing.List[fmi_models.WeatherData]:
+        """Return the current forecast data."""
+        if self.forecast is None:
+            return []
+        return self.forecast.forecasts
+
+    def get_current_place(self) -> typing.Optional[str]:
         """Return the current place."""
         if self.current is not None and hasattr(self.current, 'place'):
             return self.current.place
         return None
 
     def __update_best_weather_condition(self):
-        if self.forecast is None:
+
+        _weather = self.get_weather()
+
+        if _weather is None:
             return
 
-        if self.current is None:
-            return
+        _forecasts = self.get_forecasts()
 
         curr_date = date.today()
 
         # Init values
         self.best_state = const.BEST_CONDITION_NOT_AVAIL
-        self.best_time = self.current.data.time.astimezone(tz.tzlocal())
-        self.best_temperature = self.current.data.temperature.value
-        self.best_humidity = self.current.data.humidity.value
-        self.best_wind_speed = self.current.data.wind_speed.value
-        self.best_precipitation = self.current.data.precipitation_amount.value
+        self.best_time = _weather.data.time.astimezone(tz.tzlocal())
+        self.best_temperature = _weather.data.temperature.value
+        self.best_humidity = _weather.data.humidity.value
+        self.best_wind_speed = _weather.data.wind_speed.value
+        self.best_precipitation = _weather.data.precipitation_amount.value
 
-        for forecast in self.forecast.forecasts:
+        for forecast in _forecasts:
             local_time = forecast.time.astimezone(tz.tzlocal())
 
             if local_time.day == curr_date.day + 1:
@@ -424,29 +440,50 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         else:
             LOGGER.debug("FMI: Mareo data not updated. No data available")
 
+    async def _fetch_observation(self):
+        """Fetch the latest obsevation data from specified station."""
+        if not self.observation_station_id:
+            return None
+        try:
+            self.observation = await fmi.async_observation_by_station_id(
+                self.observation_station_id)
+        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+            LOGGER.error("FMI: unable to fetch observation data from station %d! error %s",
+                         self.observation_station_id, error)
+
+    async def _fetch_forecast_weather(self):
+        """Fetch current weather data based on estimation (forecast)."""
+        try:
+            data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
+        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+            LOGGER.error("FMI: unable to fetch weather data! error %s", error)
+            return None
+        return data
+
+    async def _fetch_forecast(self):
+        """Fetch current forecast data."""
+        if not self.forecast_points:
+            return
+        try:
+            self.forecast = await fmi.async_forecast_by_coordinates(
+                self.latitude, self.longitude, self.time_step, self.forecast_points)
+        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+            LOGGER.error("FMI: unable to fetch forecast data! error %s", error)
+
     async def _async_update_data(self):
         """Update data via Open API."""
 
         # do actual data fetching
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
-                # Fetch current weather data
-                weather_data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
-
-                if self.observation_enabled and weather_data and weather_data.place is not None \
-                        and hasattr(fmi, 'async_observation_by_place'):
-                    # Fetch observation data from closest station
-                    LOGGER.debug("FMI: Fetching observation data for a place %s",
-                                 weather_data.place)
-                    observation_data = await fmi.async_observation_by_place(weather_data.place)
-                    if observation_data is not None:
-                        weather_data = observation_data
-
+                await self._fetch_observation()
+                weather_data = await self._fetch_forecast_weather()
+                if not weather_data:
+                    # Weather is always needed!
+                    raise UpdateFailed("FMI: Unable to fetch observation or forecast data!")
                 self.current = weather_data
 
-                if self.forecast_points:
-                    self.forecast = await fmi.async_forecast_by_coordinates(
-                        self.latitude, self.longitude, self.time_step, self.forecast_points)
+                await self._fetch_forecast()
 
                 # Update best time parameters
                 await self._hass.async_add_executor_job(self.__update_best_weather_condition)
@@ -461,6 +498,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._hass.async_add_executor_job(self.__update_mareo_data)
                 LOGGER.debug("FMI: Mareograph sea level data updated")
 
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+        except UpdateFailed as error:
             raise UpdateFailed(error) from error
         return {}

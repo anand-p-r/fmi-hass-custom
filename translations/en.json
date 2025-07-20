@@ -36,7 +36,7 @@
                     "daily_mode": "Activate Daily forecast entity",
                     "lightning_sensor": "Activate Lightning sensor",
                     "lightning_radius": "Lightning sensor radius km",
-                    "observation_enabled": "Enable Observation"
+                    "observation_station_id": "FMI's Observation Station ID"
                 },
                 "description": "Maximum and minimum parameters are used to determine the Best Time Of The Day",
                 "title": "Finnish Meteorological Institute Options"

@@ -224,13 +224,15 @@ class FMIBestConditionSensor(_BaseSensorClass):
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
 
-        if _fmi.current is None:
+        weather = _fmi.get_weather()
+
+        if weather is None:
             const.LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
 
         # update the extra state attributes
         self._attr_extra_state_attributes = {
-            ha_const.ATTR_LOCATION: _fmi.current.place,
+            ha_const.ATTR_LOCATION: weather.place,
             ha_const.ATTR_TIME: _fmi.best_time,
             ha_const.ATTR_TEMPERATURE: _fmi.best_temperature,
             const.ATTR_HUMIDITY: _fmi.best_humidity,
@@ -240,7 +242,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
         }
 
         if self.type == SensorType.PLACE:
-            self._state = _fmi.current.place
+            self._state = weather.place
             return
 
         source_data = None
@@ -248,21 +250,23 @@ class FMIBestConditionSensor(_BaseSensorClass):
         # Update the sensor states
         if _fmi.time_step == 1:
             # Current weather
-            source_data = _fmi.current.data
+            source_data = weather.data
         else:
             # Forecasted weather based on configured time_step - next forecasted hour, if available
 
-            if _fmi.forecast is None or not _fmi.forecast.forecasts:
+            _forecasts = _fmi.get_forecasts()
+
+            if not _forecasts:
                 const.LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
             # If current time is half past or more then use the hour next to next hour
             # otherwise fallback to the next hour
-            if len(_fmi.forecast.forecasts) > 1:
+            if len(_forecasts) > 1:
                 curr_min = datetime.now().minute
-                source_data = _fmi.forecast.forecasts[1 if curr_min >= 30 else 0]
+                source_data = _forecasts[1 if curr_min >= 30 else 0]
             else:
-                source_data = _fmi.forecast.forecasts[0]
+                source_data = _forecasts[0]
 
         if source_data is None:
             self._state = ha_const.STATE_UNAVAILABLE
