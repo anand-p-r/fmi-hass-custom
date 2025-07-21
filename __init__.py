@@ -53,10 +53,20 @@ async def async_setup_entry(hass, config_entry) -> bool:
     if not coordinator.last_update_success:
         raise ConfigEntryNotReady
 
+    try:
+        coordinator_observation = FMIObservationUpdateCoordinator(
+            hass, websession, config_entry)
+        await coordinator_observation.async_refresh()
+        if not coordinator_observation.last_update_success:
+            raise ConfigEntryNotReady
+    except AttributeError:
+        coordinator_observation = None
+
     undo_listener = config_entry.add_update_listener(update_listener)
 
     hass.data[const.DOMAIN][config_entry.entry_id] = {
         const.COORDINATOR: coordinator,
+        const.COORDINATOR_OBSERVATION: coordinator_observation,
         const.UNDO_UPDATE_LISTENER: undo_listener,
     }
 
@@ -132,7 +142,9 @@ class FMIMareoStruct():
 class FMIDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching FMI data API."""
 
-    def __init__(self, hass: HomeAssistant, session, config_entry):
+    def __init__(self, hass: HomeAssistant, session, config_entry,
+                 update_interval=const.FORECAST_UPDATE_INTERVAL,
+                 unique_id_add="", name=""):
         """Initialize."""
 
         _ = session
@@ -145,7 +157,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         self.latitude = config_entry.data[CONF_LATITUDE]
         self.longitude = config_entry.data[CONF_LONGITUDE]
-        self.unique_id = str(self.latitude) + ":" + str(self.longitude)
+        self.unique_id = str(self.latitude) + ":" + str(self.longitude) + unique_id_add
 
         _options: dict = config_entry.options
 
@@ -175,7 +187,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             const.CONF_LIGHTNING, const.LIGHTNING_DEFAULT))
         self.lightning_radius = int(_options.get(
             const.CONF_LIGHTNING_DISTANCE, const.BOUNDING_BOX_HALF_SIDE_KM))
-        self.observation_station_id = int(_options.get(const.CONF_OBSERVATION_STATION, 0))
 
         # Observation data if the station id is set and valid
         self.observation: typing.Optional[fmi_models.Weather] = None
@@ -199,12 +210,12 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         # Mareo
         self.mareo_data: typing.Optional[FMIMareoStruct] = None
 
-        min_update_time = const.MIN_TIME_BETWEEN_UPDATES
+        name = name if name else const.DOMAIN
 
-        LOGGER.debug("FMI: Data will be updated every %s min", min_update_time)
+        LOGGER.debug(f"FMI {name}: Data will be updated every {update_interval} min")
 
         super().__init__(hass, LOGGER, config_entry=config_entry,
-                         name=const.DOMAIN, update_interval=min_update_time)
+                         name=name, update_interval=update_interval)
 
     def get_observation(self) -> typing.Optional[fmi_models.Weather]:
         """Return the current observation data."""
@@ -440,17 +451,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         else:
             LOGGER.debug("FMI: Mareo data not updated. No data available")
 
-    async def _fetch_observation(self):
-        """Fetch the latest obsevation data from specified station."""
-        if not self.observation_station_id:
-            return None
-        try:
-            self.observation = await fmi.async_observation_by_station_id(
-                self.observation_station_id)
-        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
-            LOGGER.error("FMI: unable to fetch observation data from station %d! error %s",
-                         self.observation_station_id, error)
-
     async def _fetch_forecast_weather(self):
         """Fetch current weather data based on estimation (forecast)."""
         try:
@@ -476,7 +476,6 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         # do actual data fetching
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
-                await self._fetch_observation()
                 weather_data = await self._fetch_forecast_weather()
                 if not weather_data:
                     # Weather is always needed!
@@ -498,6 +497,42 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._hass.async_add_executor_job(self.__update_mareo_data)
                 LOGGER.debug("FMI: Mareograph sea level data updated")
 
-        except UpdateFailed as error:
+        except (TimeoutError, UpdateFailed) as error:
+            raise UpdateFailed(error) from error
+        return {}
+
+
+class FMIObservationUpdateCoordinator(FMIDataUpdateCoordinator):
+
+    def __init__(self, hass: HomeAssistant, session, config_entry,
+                 update_interval=const.OBSERVATION_UPDATE_INTERVAL):
+
+        self.observation_station_id = int(
+            config_entry.options.get(const.CONF_OBSERVATION_STATION, 0))
+        if not self.observation_station_id:
+            raise AttributeError("observation not configured!")
+
+        name = f"{const.DOMAIN} Observation"
+
+        super().__init__(hass, session, config_entry, update_interval,
+                         unique_id_add="_observation", name=name)
+
+    async def _fetch_observation(self):
+        """Fetch the latest obsevation data from specified station."""
+        if not self.observation_station_id:
+            return None
+        try:
+            self.observation = await fmi.async_observation_by_station_id(
+                self.observation_station_id)
+        except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
+            LOGGER.error("FMI: unable to fetch observation data from station %d! error %s",
+                         self.observation_station_id, error)
+
+    async def _async_update_data(self):
+        """Update observation data via Open API."""
+        try:
+            async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
+                await self._fetch_observation()
+        except (TimeoutError, UpdateFailed) as error:
             raise UpdateFailed(error) from error
         return {}

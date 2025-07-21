@@ -35,7 +35,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     daily_mode = config_entry.options.get(const.CONF_DAILY_MODE, False)
     station_id = bool(config_entry.options.get(const.CONF_OBSERVATION_STATION, 0))
 
-    coordinator = hass.data[const.DOMAIN][config_entry.entry_id][const.COORDINATOR]
+    domain_data = hass.data[const.DOMAIN][config_entry.entry_id]
+
+    coordinator = domain_data[const.COORDINATOR]
 
     entity_list = [FMIWeatherEntity(name, coordinator)]
     if daily_mode:
@@ -43,10 +45,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                                             daily_mode=True))
     if station_id:
         try:
-            entity_list.append(FMIWeatherEntity(f"{name} (observation)", coordinator,
-                                                station_id=station_id))
-        except AttributeError:
-            const.LOGGER.error("Unable to setup observation object!")
+            coordinator = domain_data.get(const.COORDINATOR_OBSERVATION)
+            if coordinator is not None:
+                entity_list.append(FMIWeatherEntity(
+                    f"{name} (observation)", coordinator, station_id=station_id))
+        except (KeyError, AttributeError) as error:
+            const.LOGGER.error("Unable to setup observation object! ERROR: %s", error)
 
     async_add_entities(entity_list, False)
 
@@ -69,17 +73,19 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
         _weather = self._data_func()
         _attr_name = [_weather.place if _weather else name]
         _attr_unique_id = [f"{coordinator.unique_id}"]
+        _name_extra = ""
         if daily_mode:
             _attr_name.append("(daily)")
             _attr_unique_id.append("daily")
         elif station_id:
             _attr_name.append("(observation)")
             _attr_unique_id.append("observation")
+            _name_extra = " Observation"
         self._attr_name = " ".join(_attr_name)
         self._attr_unique_id = "_".join(_attr_unique_id)
         self._attr_device_info = {
             "identifiers": {(const.DOMAIN, coordinator.unique_id)},
-            "name": const.NAME,
+            "name": const.NAME + _name_extra,
             "manufacturer": const.MANUFACTURER,
             "entry_type": DeviceEntryType.SERVICE,
         }
