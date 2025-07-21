@@ -15,7 +15,9 @@ TIMEOUT_MAREO_PULL_IN_SECS = 5
 LIGHTNING_LOOP_TIMEOUT_IN_SECS = 20
 
 COORDINATOR = "coordinator"
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=30)
+COORDINATOR_OBSERVATION = "coordinator_observation"
+FORECAST_UPDATE_INTERVAL = timedelta(minutes=30)
+OBSERVATION_UPDATE_INTERVAL = timedelta(minutes=10)
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
 CONF_FORECAST_DAYS = "forecast_days"
