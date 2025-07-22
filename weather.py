@@ -1,4 +1,5 @@
 """Support for retrieving meteorological data from FMI (Finnish Meteorological Institute)."""
+import math
 from dateutil import tz
 
 from homeassistant.components.weather import (
@@ -7,8 +8,10 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
+    ATTR_FORECAST_WIND_GUST_SPEED,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_CLOUD_COVERAGE,
     WeatherEntity,
     Forecast,
 )
@@ -18,6 +21,7 @@ from homeassistant.components.weather.const import (
     WeatherEntityFeature,
 )
 from homeassistant.const import CONF_NAME
+import homeassistant.core as ha_core
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -66,6 +70,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     def __init__(self, name, coordinator: FMIDataUpdateCoordinator,
                  station_id: bool = False, daily_mode: bool = False):
         """Initialize FMI weather object."""
+        self.logger = const.LOGGER.getChild("weather")
         super().__init__(coordinator)
         self._daily_mode = daily_mode
         self._observation_mode = station_id
@@ -89,80 +94,61 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             "manufacturer": const.MANUFACTURER,
             "entry_type": DeviceEntryType.SERVICE,
         }
+        self._attr_should_poll = False
         self._attr_attribution = const.ATTRIBUTION
-        self._attr_native_temperature_unit = _weather.data.temperature.unit
-        self._attr_native_pressure_unit = _weather.data.pressure.unit
-        self._attr_native_wind_speed_unit = _weather.data.wind_speed.unit
+        # update initial values
+        self.update_callback()
+        # register the update callback
+        coordinator.async_add_listener(self.update_callback)
 
-    @property
-    def available(self):
-        """Return if weather data is available from FMI."""
-        return self._data_func() is not None
+    @ha_core.callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
 
-    @property
-    def native_temperature(self):
-        """Return the temperature."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.temperature.value
-
-    @property
-    def humidity(self):
-        """Return the humidity."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.humidity.value
-
-    @property
-    def native_precipitation(self):
-        """Return the precipitation."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.precipitation_amount.value
-
-    @property
-    def native_wind_speed(self):
-        """Return the wind speed."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.wind_speed.value
-
-    @property
-    def wind_bearing(self):
-        """Return the wind bearing."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.wind_direction.value
-
-    @property
-    def native_pressure(self):
-        """Return the pressure."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.pressure.value
-
-    @property
-    def native_dew_point(self) -> float | None:
-        """Return the dew point."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
-        return _weather.data.dew_point.value
-
-    @property
-    def condition(self):
-        """Return the condition."""
-        _weather = self._data_func()
-        if _weather is None:
-            return None
+    def update_callback(self, *_, **__):
+        """Update the entity attributes."""
         _fmi: FMIDataUpdateCoordinator = self.coordinator
-        return utils.get_weather_symbol(_weather.data.symbol.value, _fmi.hass)
+        _last_update_success = _fmi.last_update_success
+        _weather = self._data_func()
+        if _weather is None or not _last_update_success:
+            self.logger.warning(f"{self._attr_name}: No data available from FMI!")
+            return
+        _time = _weather.data.time.astimezone(tz.tzlocal())
+        self.logger.debug(f"{self._attr_name}: updated: {_last_update_success} time {_time}")
+        # Update the entity attributes
+        self._attr_native_temperature_unit = self.__get_unit(_weather, "temperature")
+        self._attr_native_pressure_unit = self.__get_unit(_weather, "pressure")
+        self._attr_native_wind_speed_unit = self.__get_unit(_weather, "wind_speed")
+        self._attr_native_temperature = self.__get_value(_weather, "temperature")
+        self._attr_humidity = self.__get_value(_weather, "humidity")
+        self._attr_native_precipitation = self.__get_value(_weather, "precipitation_amount")
+        self._attr_native_wind_speed = self.__get_value(_weather, "wind_speed")
+        wind_gust = self.__get_value(_weather, "wind_gust")
+        if wind_gust is None or math.isnan(wind_gust):
+            wind_gust = self.__get_value(_weather, "wind_max")
+        self._attr_native_wind_gust_speed = wind_gust
+        self._attr_wind_bearing = self.__get_value(_weather, "wind_direction")
+        self._attr_cloud_coverage = self.__get_value(_weather, "cloud_cover")
+        self._attr_native_pressure = self.__get_value(_weather, "pressure")
+        self._attr_native_dew_point = self.__get_value(_weather, "dew_point")
+        self._attr_condition = utils.get_weather_symbol(_weather.data.symbol.value, _fmi.hass)
+
+    def __get_value(self, _weather, name):
+        if _weather is None:
+            return None
+        value = getattr(_weather.data, name)
+        if value is None or value.value is None or math.isnan(value.value):
+            return None
+        return value.value
+
+    def __get_unit(self, _weather, name):
+        if _weather is None:
+            return None
+        value = getattr(_weather.data, name)
+        if value is None or not value.unit:
+            return None
+        return value.unit
 
     def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
         """Return the forecast array."""
@@ -188,8 +174,10 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                             ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
                             ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
                             ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                            ATTR_FORECAST_WIND_GUST_SPEED: forecast.wind_gust.value,
                             ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                             ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                            ATTR_FORECAST_CLOUD_COVERAGE: forecast.cloud_cover.value,
                         }
                     )
                 else:
@@ -209,8 +197,10 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
                     ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
                     ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
                     ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
+                    ATTR_FORECAST_WIND_GUST_SPEED: forecast.wind_gust.value,
                     ATTR_WEATHER_PRESSURE: forecast.pressure.value,
                     ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
+                    ATTR_FORECAST_CLOUD_COVERAGE: forecast.cloud_cover.value,
                 }
             )
         return data

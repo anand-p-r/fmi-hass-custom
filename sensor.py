@@ -6,7 +6,7 @@ from datetime import datetime
 from dateutil import tz
 # Import homeassistant platform dependencies
 import homeassistant.const as ha_const
-from homeassistant.components.sensor import SensorStateClass
+import homeassistant.core as ha_core
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import FMIDataUpdateCoordinator
@@ -88,12 +88,13 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class _BaseSensorClass(CoordinatorEntity):
     """Common base class for all the sensor types."""
 
-    def __init__(self, name, coordinator, sensor_type, sensor_data, only_name=None):
+    def __init__(self, name, coordinator: FMIDataUpdateCoordinator,
+                 sensor_type, sensor_data, only_name=None):
         """Initialize the sensor base data."""
+        self.logger = const.LOGGER.getChild("sensor")
         super().__init__(coordinator)
         self.client_name = name
         self._name, self._attr_unit_of_measurement, self._attr_icon = sensor_data
-        self._state = ha_const.STATE_UNAVAILABLE
         self.type = sensor_type
         self._attr_unique_id = \
             f"{coordinator.unique_id}_{name.replace(' ', '_')}_{self._name.replace(' ', '_')}"
@@ -104,25 +105,31 @@ class _BaseSensorClass(CoordinatorEntity):
             if base_name is None:
                 base_name = name
             self._attr_name = f"{base_name} {self._name}"
-        self._attr_extra_state_attributes = {ha_const.ATTR_ATTRIBUTION: const.ATTRIBUTION}
+        self._attr_attribution = const.ATTRIBUTION
+        self._attr_should_poll = False
+        self._attr_state = ha_const.STATE_UNAVAILABLE
+        self.update()
+
+        coordinator.async_add_listener(self.update_callback)
+
+    @ha_core.callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
+    def update_callback(self, *_, **__):
+        """Update the entity attributes."""
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        _weather = _fmi.get_weather()
+        if not _weather:
+            return
+        _time = _weather.data.time.astimezone(tz.tzlocal())
+        self.logger.debug(f"{self._attr_name}: updated: {_fmi.last_update_success} time {_time}")
         self.update()
 
     def update(self):
         """Update method prototype."""
-        raise NotImplementedError(
-            "Required update method is not implemented")
-
-    @property
-    def state_class(self):
-        """Return the state class."""
-        return SensorStateClass.MEASUREMENT
-
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        const.LOGGER.debug("FMI: updating sensor %s", self._attr_name)
-        self.update()
-        return self._state
+        raise NotImplementedError("Required update method is not implemented")
 
 
 class FMIBestConditionSensor(_BaseSensorClass):
@@ -173,19 +180,19 @@ class FMIBestConditionSensor(_BaseSensorClass):
     def __convert_float(self, source_data, name):
         value = getattr(source_data, name)
         if value is None or math.isnan(value.value):
-            self._state = ha_const.STATE_UNAVAILABLE
+            self._attr_state = ha_const.STATE_UNAVAILABLE
             return
-        self._state = value.value
+        self._attr_state = value.value
 
     def __update_dummy(self, source_data):
         _ = source_data
-        self._state = ha_const.STATE_UNKNOWN
+        self._attr_state = ha_const.STATE_UNKNOWN
 
     def __update_forecast_time(self, source_data):
-        self._state = source_data.time.astimezone(tz.tzlocal()).strftime("%H:%M")
+        self._attr_state = source_data.time.astimezone(tz.tzlocal()).strftime("%H:%M")
 
     def __update_weather(self, source_data):
-        self._state = utils.get_weather_symbol(source_data.symbol.value)
+        self._attr_state = utils.get_weather_symbol(source_data.symbol.value)
 
     def __update_temperature(self, source_data):
         self.__convert_float(source_data, "temperature")
@@ -195,9 +202,9 @@ class FMIBestConditionSensor(_BaseSensorClass):
 
     def __update_wind_direction(self, source_data):
         if source_data.wind_direction is None:
-            self._state = ha_const.STATE_UNAVAILABLE
+            self._attr_state = ha_const.STATE_UNAVAILABLE
             return
-        self._state = self.get_wind_direction_string(source_data.wind_direction.value)
+        self._attr_state = self.get_wind_direction_string(source_data.wind_direction.value)
 
     def __update_wind_gust(self, source_data):
         self.__convert_float(source_data, "wind_gust")
@@ -215,19 +222,19 @@ class FMIBestConditionSensor(_BaseSensorClass):
         _ = source_data
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         if _fmi.best_time is None:
-            self._state = ha_const.STATE_UNAVAILABLE
+            self._attr_state = ha_const.STATE_UNAVAILABLE
             return
-        self._state = _fmi.best_time.strftime("%H:%M")
+        self._attr_state = _fmi.best_time.strftime("%H:%M")
 
     def update(self):
         """Update the state of the weather sensor."""
 
-        _fmi: FMIDataUpdateCoordinator = self.coordinator
+        self.logger.debug("FMI: Sensor %s is updating", self._attr_name)
 
+        _fmi: FMIDataUpdateCoordinator = self.coordinator
         weather = _fmi.get_weather()
 
         if weather is None:
-            const.LOGGER.debug("FMI: Sensor _FMI Current Forecast is unavailable")
             return
 
         # update the extra state attributes
@@ -242,7 +249,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
         }
 
         if self.type == SensorType.PLACE:
-            self._state = weather.place
+            self._attr_state = weather.place
             return
 
         source_data = None
@@ -257,7 +264,7 @@ class FMIBestConditionSensor(_BaseSensorClass):
             _forecasts = _fmi.get_forecasts()
 
             if not _forecasts:
-                const.LOGGER.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
+                self.logger.debug("FMI: Sensor _FMI Hourly Forecast is unavailable")
                 return
 
             # If current time is half past or more then use the hour next to next hour
@@ -269,8 +276,8 @@ class FMIBestConditionSensor(_BaseSensorClass):
                 source_data = _forecasts[0]
 
         if source_data is None:
-            self._state = ha_const.STATE_UNAVAILABLE
-            const.LOGGER.debug("FMI: Sensor Source data is unavailable")
+            self._attr_state = ha_const.STATE_UNAVAILABLE
+            self.logger.debug("FMI: Sensor Source data is unavailable")
             return
 
         self.update_state_func(source_data)
@@ -282,16 +289,16 @@ class FMILightningStrikesSensor(_BaseSensorClass):
     def update(self):
         """Update the state of the lightning sensor."""
 
-        const.LOGGER.debug("FMI: update lightning sensor %s", self._attr_name)
+        self.logger.debug("FMI: update lightning sensor %s", self._attr_name)
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         _data = _fmi.lightning_data
 
         if not _data:
-            const.LOGGER.debug("FMI: Sensor lightning is unavailable")
+            self.logger.debug("FMI: Sensor lightning is unavailable")
             return
 
-        self._state = _data[0].location
+        self._attr_state = _data[0].location
 
         # update the extra state attributes
         self._attr_extra_state_attributes = {
@@ -324,18 +331,18 @@ class FMIMareoSensor(_BaseSensorClass):
     def update(self):
         """Update the state of the mareo sensor."""
 
-        const.LOGGER.debug("FMI: update reo sensor %s", self._attr_name)
+        self.logger.debug("FMI: update mareo sensor %s", self._attr_name)
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         mareo = _fmi.mareo_data
 
         if not mareo or not mareo.size():
-            const.LOGGER.debug("FMI: Sensor mareo is unavailable")
+            self.logger.debug("FMI: Sensor mareo is unavailable")
             return
 
         mareo_data = mareo.get_values()
 
-        self._state = mareo_data[0].sea_level
+        self._attr_state = mareo_data[0].sea_level
 
         # update the extra state attributes
         self._attr_extra_state_attributes = {
