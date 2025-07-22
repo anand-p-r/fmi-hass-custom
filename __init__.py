@@ -13,6 +13,7 @@ from async_timeout import timeout
 from dateutil import tz
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_OFFSET
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
@@ -48,7 +49,7 @@ async def async_setup_entry(hass, config_entry) -> bool:
     coordinator = FMIDataUpdateCoordinator(
         hass, websession, config_entry
     )
-    await coordinator.async_refresh()
+    await coordinator.async_config_entry_first_refresh()
 
     if not coordinator.last_update_success:
         raise ConfigEntryNotReady
@@ -56,7 +57,7 @@ async def async_setup_entry(hass, config_entry) -> bool:
     try:
         coordinator_observation = FMIObservationUpdateCoordinator(
             hass, websession, config_entry)
-        await coordinator_observation.async_refresh()
+        await coordinator_observation.async_config_entry_first_refresh()
         if not coordinator_observation.last_update_success:
             raise ConfigEntryNotReady
     except AttributeError:
@@ -99,23 +100,26 @@ class FMILightningStruct():
     def __init__(self, time_val, location, distance, strikes,
                  peak_current, cloud_cover, ellipse_major):
         """Initialize the lightning parameters."""
-        self.time = time_val
+        # self.time = time_val
+        _time = datetime.fromisoformat(time_val)
+        self.time = _time.strftime("%Y-%m-%d %H:%M")
         self.location = location
-        self.distance = distance
-        self.strikes = strikes
-        self.peak_current = peak_current
-        self.cloud_cover = cloud_cover
-        self.ellipse_major = ellipse_major
+        self.distance = float(f"{float(distance):.2f}")
+        self.strikes = int(strikes)
+        self.peak_current = float(peak_current)
+        self.cloud_cover = float(cloud_cover)
+        self.ellipse_major = float(ellipse_major)
 
 
 class FMIMareoStruct():
     """Mareo data structure"""
 
     class SeaLevelData():
-        def __init__(self, time_val: datetime, sea_level: float):
+        def __init__(self, time_val: str, sea_level: float):
             """Initialize the sea level data."""
-            self.time = time_val
-            self.sea_level = sea_level
+            _time = datetime.fromisoformat(time_val)
+            self.time = _time.strftime("%Y-%m-%d %H:%M")
+            self.sea_level = float(sea_level)
 
     def __init__(self):
         """Initialize the sea height data."""
@@ -146,18 +150,16 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                  update_interval=const.FORECAST_UPDATE_INTERVAL,
                  unique_id_add="", name=""):
         """Initialize."""
-
         _ = session
 
-        LOGGER.debug("Using lat: %s and long: %s",
-                     config_entry.data[CONF_LATITUDE],
-                     config_entry.data[CONF_LONGITUDE])
+        self.logger = const.LOGGER.getChild("coordinator")
 
         self._hass = hass
+        self.latitude = latitude = config_entry.data[CONF_LATITUDE]
+        self.longitude = longitude = config_entry.data[CONF_LONGITUDE]
+        self.unique_id = str(latitude) + ":" + str(longitude) + unique_id_add
 
-        self.latitude = config_entry.data[CONF_LATITUDE]
-        self.longitude = config_entry.data[CONF_LONGITUDE]
-        self.unique_id = str(self.latitude) + ":" + str(self.longitude) + unique_id_add
+        self.logger.debug(f"Using latitude: {latitude} and longitude: {longitude}")
 
         _options: dict = config_entry.options
 
@@ -212,9 +214,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
         name = name if name else const.DOMAIN
 
-        LOGGER.debug(f"FMI {name}: Data will be updated every {update_interval} min")
+        self.logger.debug(f"FMI {name}: Data will be updated every {update_interval} min")
 
-        super().__init__(hass, LOGGER, config_entry=config_entry,
+        super().__init__(hass, self.logger, config_entry=config_entry,
                          name=name, update_interval=update_interval)
 
     def get_observation(self) -> typing.Optional[fmi_models.Weather]:
@@ -264,20 +266,25 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 break
 
             if (forecast.symbol.value not in const.BEST_COND_SYMBOLS or
-                    forecast.wind_speed.value < self.min_wind_speed or
-                    forecast.wind_speed.value > self.max_wind_speed):
+                    (wind_speed := forecast.wind_speed.value) is None or
+                    wind_speed < self.min_wind_speed or
+                    wind_speed > self.max_wind_speed):
                 continue
 
-            if (forecast.temperature.value < self.min_temperature or
-                    forecast.temperature.value > self.max_temperature):
+            temperature = forecast.temperature.value
+            if (temperature is None or
+                    temperature < self.min_temperature or
+                    temperature > self.max_temperature):
                 continue
 
-            if (forecast.humidity.value < self.min_humidity or
-                    forecast.humidity.value > self.max_humidity):
+            if ((humidity := forecast.humidity.value) is None or
+                    humidity < self.min_humidity or
+                    humidity > self.max_humidity):
                 continue
 
-            if (forecast.precipitation_amount.value < self.min_precip or
-                    forecast.precipitation_amount.value > self.max_precip):
+            if ((precipitation_amount := forecast.precipitation_amount.value) is None or
+                    precipitation_amount < self.min_precip or
+                    precipitation_amount > self.max_precip):
                 continue
 
             # What more can you ask for?
@@ -286,9 +293,9 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
             self.best_state = const.BEST_CONDITION_AVAIL
 
-            if forecast.temperature.value > self.best_temperature:
+            if self.best_temperature is None or temperature > self.best_temperature:
                 self.best_time = local_time
-                self.best_temperature = forecast.temperature.value
+                self.best_temperature = temperature
                 self.best_humidity = forecast.humidity.value
                 self.best_wind_speed = forecast.wind_speed.value
                 self.best_precipitation = forecast.precipitation_amount.value
@@ -309,8 +316,8 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             try:
                 distance = geodesic(lightning_coords, home_cords).km
             except (AttributeError, ValueError):
-                LOGGER.info("Unable to find distance between "
-                            f"{lightning_coords} and {home_cords}")
+                self.logger.error("Unable to find distance between "
+                                  f"{lightning_coords} and {home_cords}")
 
             add_tuple = (val_split[0], val_split[1], val_split[2],
                          distance, loc_index)
@@ -331,7 +338,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             exist_tuple = loc_list[index]
 
             if index != exist_tuple[4]:
-                LOGGER.debug("Record mismatch - aborting query")
+                self.logger.debug("Record mismatch - aborting query")
                 break
 
             loc_list[index] = (exist_tuple[0], exist_tuple[1], exist_tuple[2],
@@ -356,14 +363,14 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             f"{bbox_coords.lon_max},{bbox_coords.lat_max}"
 
         base_url = const.LIGHTNING_GET_URL + start_time + "&" + bbox_uri_param + "&"
-        LOGGER.debug(f"FMI: Lightning URI - {base_url}")
+        self.logger.debug(f"FMI: Lightning URI - {base_url}")
 
         # Fetch data
         response = requests.get(base_url, timeout=const.TIMEOUT_LIGHTNING_PULL_IN_SECS)
         return ET.fromstring(response.content)
 
     def __update_lightning_strikes(self):
-        LOGGER.debug("FMI: Lightning started")
+        self.logger.debug("FMI: Lightning started")
 
         loc_time_list = []
         root = self.__get_lightning_url()
@@ -383,7 +390,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         # First sort for closes entries and filter to limit
         loc_time_list = sorted(loc_time_list, key=lambda item: item[3])
 
-        LOGGER.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
+        self.logger.debug(f"FMI - Coords retrieved for Lightning Data- {len(loc_time_list)}")
 
         loc_time_list = loc_time_list[:const.LIGHTNING_LIMIT]
 
@@ -398,9 +405,10 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             location = str(v[0]) + ", " + str(v[1])
             loc_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(v[2])))
             try:
-                location = geolocator.reverse(location, language="en").address
-            except (AttributeError, ValueError) as e:
-                LOGGER.info(f"Unable to reverse geocode for address-{location}. Got error-{e}")
+                location = geolocator.reverse(location, language="en", timeout=5).address
+            except (AttributeError, ValueError, GeocoderUnavailable, GeocoderTimedOut) as e:
+                self.logger.error(f"Unable to reverse geocode for address-{location}. "
+                                  f"Got error-{e}")
 
             # Time, Location, Distance, Strikes, Peak Current, Cloud Cover, Ellipse Major
             op = FMILightningStruct(time_val=loc_time, location=location, distance=v[3],
@@ -408,13 +416,13 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                                     ellipse_major=v[7])
             op_tuples.append(op)
         self.lightning_data = op_tuples
-        LOGGER.debug("FMI: Lightning ended")
+        self.logger.debug("FMI: Lightning ended")
 
     # Update mareo data
     def __update_mareo_data(self):
         """Get the latest mareograph forecast data from FMI and update the states."""
 
-        LOGGER.debug("FMI: mareo started")
+        self.logger.debug("FMI: mareo started")
         # Format datetime to string accepted as path parameter in REST
         start_time = datetime.today().strftime("starttime=%Y-%m-%dT%H:%M:%SZ")
 
@@ -422,7 +430,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         loc_string = "latlon=" + str(self.latitude) + "," + str(self.longitude)
 
         base_mareo_url = const.MAREO_GET_URL + loc_string + "&" + start_time + "&"
-        LOGGER.debug("FMI: Using Mareo URL: %s", base_mareo_url)
+        self.logger.debug("FMI: Using Mareo URL: %s", base_mareo_url)
 
         # Fetch data
         response_mareo = requests.get(base_mareo_url, timeout=const.TIMEOUT_MAREO_PULL_IN_SECS)
@@ -439,24 +447,24 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
                 elif mareo[0][2].text == 'SeaLevelN2000':
                     continue
                 else:
-                    LOGGER.debug("Sealevel forecast unsupported record: %s",
-                                 mareo[0][2].text)
+                    self.logger.debug("Sealevel forecast unsupported record: %s",
+                                      mareo[0][2].text)
                     continue
             except IndexError:
-                LOGGER.debug("Sealevel forecast records not in "
-                             f"expected format for index - {index} of locstring - {loc_string}")
+                self.logger.debug("Sealevel forecast records not in expected format "
+                                  f"for index - {index} of locstring - {loc_string}")
 
         if mareo_data.size():
-            LOGGER.debug("FMI: Mareo data updated")
+            self.logger.debug("FMI: Mareo data updated")
         else:
-            LOGGER.debug("FMI: Mareo data not updated. No data available")
+            self.logger.debug("FMI: Mareo data not updated. No data available")
 
     async def _fetch_forecast_weather(self):
         """Fetch current weather data based on estimation (forecast)."""
         try:
             data = await fmi.async_weather_by_coordinates(self.latitude, self.longitude)
         except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
-            LOGGER.error("FMI: unable to fetch weather data! error %s", error)
+            self.logger.error("FMI: unable to fetch weather data! error %s", error)
             return None
         return data
 
@@ -468,7 +476,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
             self.forecast = await fmi.async_forecast_by_coordinates(
                 self.latitude, self.longitude, self.time_step, self.forecast_points)
         except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
-            LOGGER.error("FMI: unable to fetch forecast data! error %s", error)
+            self.logger.error("FMI: unable to fetch forecast data! error %s", error)
 
     async def _async_update_data(self):
         """Update data via Open API."""
@@ -476,6 +484,7 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
         # do actual data fetching
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
+                self.logger.debug("FMI: fetch latest forecast data")
                 weather_data = await self._fetch_forecast_weather()
                 if not weather_data:
                     # Weather is always needed!
@@ -486,19 +495,21 @@ class FMIDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # Update best time parameters
                 await self._hass.async_add_executor_job(self.__update_best_weather_condition)
-                LOGGER.debug("FMI: Best Conditions updated")
+                self.logger.debug("FMI: Best Conditions updated")
 
                 # Update lightning strikes
                 if self.lightning_mode and self.lightning_radius:
                     await self._hass.async_add_executor_job(self.__update_lightning_strikes)
-                    LOGGER.debug("FMI: Lightning Conditions updated")
+                    self.logger.debug("FMI: Lightning Conditions updated")
 
                 # Update mareograph data on sea level
                 await self._hass.async_add_executor_job(self.__update_mareo_data)
-                LOGGER.debug("FMI: Mareograph sea level data updated")
+                self.logger.debug("FMI: Mareograph sea level data updated")
 
         except (TimeoutError, UpdateFailed) as error:
             raise UpdateFailed(error) from error
+
+        self.async_set_updated_data({"current": self.current})
         return {}
 
 
@@ -525,11 +536,13 @@ class FMIObservationUpdateCoordinator(FMIDataUpdateCoordinator):
             self.observation = await fmi.async_observation_by_station_id(
                 self.observation_station_id)
         except (fmi_erros.ClientError, fmi_erros.ServerError) as error:
-            LOGGER.error("FMI: unable to fetch observation data from station %d! error %s",
-                         self.observation_station_id, error)
+            self.logger.error("FMI: unable to fetch observation data from station %d! error %s",
+                              self.observation_station_id, error)
 
     async def _async_update_data(self):
         """Update observation data via Open API."""
+        self.logger.debug("FMI: Updating observation data for station %d",
+                          self.observation_station_id)
         try:
             async with timeout(const.TIMEOUT_FMI_INTEG_IN_SEC):
                 await self._fetch_observation()
