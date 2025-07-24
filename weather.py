@@ -8,7 +8,6 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
-    ATTR_FORECAST_WIND_GUST_SPEED,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_CLOUD_COVERAGE,
@@ -137,7 +136,7 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
     def __get_value(self, _weather, name):
         if _weather is None:
             return None
-        value = getattr(_weather.data, name)
+        value = getattr(_weather.data if hasattr(_weather, "data") else _weather, name)
         if value is None or value.value is None or math.isnan(value.value):
             return None
         return value.value
@@ -150,69 +149,57 @@ class FMIWeatherEntity(CoordinatorEntity, WeatherEntity):
             return None
         return value.unit
 
-    def _forecast(self, daily_mode: bool = False) -> list[Forecast] | None:
-        """Return the forecast array."""
+    def _forecast(self, daily_mode: bool) -> list[Forecast] | None:
+        """Return the forecasts."""
 
         _fmi: FMIDataUpdateCoordinator = self.coordinator
         _forecasts = _fmi.get_forecasts()
-        data = []
+        _data = []
+        _get_val = self.__get_value
 
-        if daily_mode or self._daily_mode:
-            # Daily mode, aggregate forecast for every day
-            day = 0
-            for forecast in _forecasts:
-                fc_time = forecast.time.astimezone(tz.tzlocal())
-                if day != fc_time.day:
-                    day = fc_time.day
-                    data.append(
-                        {
-                            ATTR_FORECAST_TIME: fc_time.isoformat(),
-                            ATTR_FORECAST_CONDITION: utils.get_weather_symbol(
-                                forecast.symbol.value),
-                            ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
-                            ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.temperature.value,
-                            ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
-                            ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
-                            ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                            ATTR_FORECAST_WIND_GUST_SPEED: forecast.wind_gust.value,
-                            ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                            ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-                            ATTR_FORECAST_CLOUD_COVERAGE: forecast.cloud_cover.value,
-                        }
-                    )
-                else:
-                    if data[-1][ATTR_FORECAST_NATIVE_TEMP] < forecast.temperature.value:
-                        data[-1][ATTR_FORECAST_NATIVE_TEMP] = forecast.temperature.value
-                    if data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] > forecast.temperature.value:
-                        data[-1][ATTR_FORECAST_NATIVE_TEMP_LOW] = forecast.temperature.value
-            return data
+        _item = {}
+        _current_day = 0
 
         for forecast in _forecasts:
-            fc_time = forecast.time.astimezone(tz.tzlocal())
-            data.append(
-                {
-                    ATTR_FORECAST_TIME: fc_time.isoformat(),
+            _time = forecast.time.astimezone(tz.tzlocal())
+            _temperature = _get_val(forecast, "temperature")
+            if not daily_mode or _current_day != _time.day:
+                # add a new day
+                _current_day = _time.day
+                _item = {
+                    ATTR_FORECAST_TIME: _time.isoformat(),
                     ATTR_FORECAST_CONDITION: utils.get_weather_symbol(forecast.symbol.value),
-                    ATTR_FORECAST_NATIVE_TEMP: forecast.temperature.value,
-                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.precipitation_amount.value,
-                    ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.wind_speed.value,
-                    ATTR_FORECAST_WIND_BEARING: forecast.wind_direction.value,
-                    ATTR_FORECAST_WIND_GUST_SPEED: forecast.wind_gust.value,
-                    ATTR_WEATHER_PRESSURE: forecast.pressure.value,
-                    ATTR_WEATHER_HUMIDITY: forecast.humidity.value,
-                    ATTR_FORECAST_CLOUD_COVERAGE: forecast.cloud_cover.value,
+                    ATTR_FORECAST_NATIVE_TEMP: _temperature,
+                    ATTR_FORECAST_NATIVE_TEMP_LOW: _temperature if daily_mode else None,
+                    ATTR_FORECAST_NATIVE_PRECIPITATION: _get_val(forecast, "precipitation_amount"),
+                    ATTR_FORECAST_NATIVE_WIND_SPEED: _get_val(forecast, "wind_speed"),
+                    ATTR_FORECAST_WIND_BEARING: _get_val(forecast, "wind_direction"),
+                    ATTR_WEATHER_PRESSURE: _get_val(forecast, "pressure"),
+                    ATTR_WEATHER_HUMIDITY: _get_val(forecast, "humidity"),
+                    ATTR_FORECAST_CLOUD_COVERAGE: _get_val(forecast, "cloud_cover"),
                 }
-            )
-        return data
+                _data.append(_item)
+
+            else:
+                # update daily high and low temperature values
+                if _item[ATTR_FORECAST_NATIVE_TEMP] < _temperature:
+                    _item[ATTR_FORECAST_NATIVE_TEMP] = _temperature
+                if _item[ATTR_FORECAST_NATIVE_TEMP_LOW] > _temperature:
+                    _item[ATTR_FORECAST_NATIVE_TEMP_LOW] = _temperature
+        return _data
 
     @property
     def forecast(self) -> list[Forecast] | None:
         """Return the forecast array. Legacy version!"""
-        return self._forecast()
+        return self._forecast(daily_mode=self._daily_mode)
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return the hourly forecast in native units."""
-        return self._forecast()
+        return self._forecast(daily_mode=self._daily_mode)
+
+    async def async_forecast_twice_daily(self) -> list[Forecast] | None:
+        """Return the daily forecast in native units."""
+        raise NotImplementedError
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast in native units."""
